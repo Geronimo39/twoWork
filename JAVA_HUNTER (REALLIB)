@@ -1,0 +1,105 @@
+import pyodbc
+import pandas as pd
+import os
+
+# --- KONFIGURATION ---------------------------------------------------------
+SYSTEM_NAME = 'DEINE_AS400_IP'
+USER = 'DEIN_USER'
+PWD  = 'DEIN_PASSWORT'
+
+# Hier deine ECHTE Bibliothek eintragen! (Nicht QTEMP)
+# Damit umgehen wir das Problem, dass QSH evtl. in einen anderen Job schreibt.
+WORK_LIB = 'DEINE_NEUE_LIB' 
+
+# Pfade im IFS
+SEARCH_PATHS = ['/home', '/QOpenSys'] 
+EXTENSIONS = ['*.java', '*.jar', '*.class', '*.json', '*.xml', '*.properties']
+
+OUTPUT_XLS = 'Java_Rest_Inventory_Global.xlsx'
+# ---------------------------------------------------------------------------
+
+def run_global_hunt():
+    conn_str = f'DRIVER={{IBM i Access ODBC Driver}};SYSTEM={SYSTEM_NAME};UID={USER};PWD={PWD};'
+    
+    try:
+        # ReadOnly=True im Connection String kann helfen, manche Exit-Programme zu beruhigen,
+        # da wir ja via ODBC selbst nur lesen ("SELECT"). Das Schreiben macht QSH intern.
+        conn = pyodbc.connect(conn_str, autocommit=True, readOnly=True)
+        cursor = conn.cursor()
+        
+        print(f"--- Sherlock Java Hunter (via {WORK_LIB}) ---")
+
+        # 1. Container in der ECHTEN Lib vorbereiten
+        # Das ist ein Systembefehl (CALL), kein SQL-DDL. Oft erlaubt.
+        print(f"1. Bereite Container in {WORK_LIB} vor...")
+        try:
+            # Erstellen (falls nicht da)
+            cmd_crt = f"CRTSRCPF FILE({WORK_LIB}/JAVA_FIND) RCDLEN(1000) MBR(LISTE)"
+            cursor.execute(f"CALL QSYS2.QCMDEXC('{cmd_crt}')")
+        except:
+            # Leeren (falls schon da)
+            try: cursor.execute(f"CALL QSYS2.QCMDEXC('CLRPFM FILE({WORK_LIB}/JAVA_FIND)')")
+            except: pass
+
+        # 2. Suchen via QShell (Der "interne" Schreiber)
+        print("2. Starte Suche im IFS...")
+        
+        for path in SEARCH_PATHS:
+            for ext in EXTENSIONS:
+                print(f"   Scanne {path} nach {ext} ...")
+                
+                # Zielpfad im QSYS-Dateisystem-Format
+                # WICHTIG: .LIB, .FILE, .MBR Endungen sind Pflicht für QShell redirection
+                db2_target = f"/qsys.lib/{WORK_LIB}.lib/JAVA_FIND.file/LISTE.mbr"
+                
+                # Der Befehl: find ... >> ziel
+                unix_cmd = f"find {path} -name '{ext}' >> {db2_target} 2> /dev/null"
+                
+                # Escaping für CL
+                cl_cmd = f"QSH CMD('{unix_cmd.replace(chr(39), chr(39)*2)}')"
+                
+                try:
+                    # Umgebungsvariable gegen Absturz
+                    cursor.execute(f"CALL QSYS2.QCMDEXC('ADDENVVAR ENVVAR(QIBM_QSH_CMD_OUTPUT) VALUE(NONE) LEVEL(*JOB) REPLACE(*YES)')")
+                    
+                    # Ausführen
+                    cursor.execute(f"CALL QSYS2.QCMDEXC('{cl_cmd}')")
+                except Exception as e:
+                    print(f"   (Skip {path}: {e})")
+
+        # 3. Ergebnisse abholen (SELECT ist via ODBC erlaubt!)
+        print("3. Lade Ergebnisse herunter...")
+        
+        # Checken ob Tabelle existiert/gefüllt ist
+        try:
+            sql = f"SELECT SRCDTA FROM {WORK_LIB}.JAVA_FIND"
+            df = pd.read_sql(sql, conn)
+            
+            if not df.empty:
+                # Bereinigung
+                df.columns = ['Full_Path']
+                df['Full_Path'] = df['Full_Path'].str.strip()
+                df = df[df['Full_Path'].str.startswith('/')] # Nur echte Pfade
+                
+                # Metadaten
+                df['Dateiname'] = df['Full_Path'].apply(os.path.basename)
+                df['Typ'] = df['Dateiname'].apply(lambda x: os.path.splitext(x)[1].upper())
+                
+                df = df.drop_duplicates()
+                
+                print(f"   -> TREFFER! {len(df)} Dateien gefunden.")
+                df.to_excel(OUTPUT_XLS, index=False)
+                print(f"Gespeichert in: {OUTPUT_XLS}")
+            else:
+                print("Container ist leer. (Vielleicht hat QSH in einen anderen Job geschrieben?)")
+
+        except Exception as e:
+            print(f"Fehler beim Lesen: {e}")
+
+    except Exception as e:
+        print(f"Verbindungsfehler: {e}")
+    finally:
+        if 'conn' in locals(): conn.close()
+
+if __name__ == "__main__":
+    run_global_hunt()
