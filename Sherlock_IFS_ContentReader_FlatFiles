@@ -1,0 +1,70 @@
+import pyodbc
+import os
+
+# --- KONFIGURATION -----------------------------------------
+SYSTEM_NAME = 'DEINE_AS400_IP'
+USER = 'DEIN_USER'
+PWD  = 'DEIN_PASSWORT'
+
+# Bibliothek für den Zwischenspeicher (Deine Schreib-Lib)
+WORK_LIB = 'DEINE_NEUE_LIB' 
+
+# Welches File willst du lesen? (Beispiel)
+TARGET_IFS_FILE = '/home/Entwicklung/TestApp.java'
+# -----------------------------------------------------------
+
+def fetch_ifs_content():
+    conn_str = f'DRIVER={{IBM i Access ODBC Driver}};SYSTEM={SYSTEM_NAME};UID={USER};PWD={PWD};'
+    
+    try:
+        print(f"--- Sherlock Content Reader: {TARGET_IFS_FILE} ---")
+        conn = pyodbc.connect(conn_str, autocommit=True)
+        cursor = conn.cursor()
+
+        # 1. Hilfs-Container erstellen (Source Physical File)
+        # RCDLEN(112) ist Standard, bei sehr breiten Zeilen evtl. erhöhen (z.B. 200)
+        temp_table = f"{WORK_LIB}.READ_TEMP"
+        try:
+            # Datei erstellen (falls nicht existiert)
+            cmd = f"CRTSRCPF FILE({WORK_LIB}/READ_TEMP) RCDLEN(200) MBR(DATA) TEXT('Temp Reader')"
+            cursor.execute(f"CALL QSYS2.QCMDEXC('{cmd}')")
+        except:
+            pass # Existiert schon
+
+        # 2. Kopieren: IFS -> DB2 (Der eigentliche Trick)
+        # Wir nutzen CPYFRMSTMF. Das konvertiert den Text automatisch lesbar.
+        # WICHTIG: Pfad-Syntax für QSYS Ziel: /QSYS.LIB/LIB.LIB/FILE.FILE/MBR.MBR
+        qsys_target = f"/QSYS.LIB/{WORK_LIB}.LIB/READ_TEMP.FILE/DATA.MBR"
+        
+        # STMFCODPAG(*PCASCII) sorgt dafür, dass Umlaute/Encoding meist passen
+        copy_cmd = f"CPYFRMSTMF FROMSTMF('{TARGET_IFS_FILE}') TOMBR('{qsys_target}') MBROPT(*REPLACE) STMFCODPAG(*PCASCII) ENDLINFMT(*ALL)"
+        
+        print("Kopiere Daten intern...")
+        cursor.execute(f"CALL QSYS2.QCMDEXC('{copy_cmd}')")
+
+        # 3. Lesen via SQL
+        print("Lade Inhalt herunter...")
+        # SRCDTA ist die Spalte mit dem Textinhalt
+        cursor.execute(f"SELECT SRCDTA FROM {temp_table}")
+        rows = cursor.fetchall()
+
+        # 4. Lokal speichern
+        local_filename = os.path.basename(TARGET_IFS_FILE)
+        with open(local_filename, 'w', encoding='utf-8') as f:
+            for row in rows:
+                line = str(row[0]).rstrip()
+                f.write(line + '\n')
+
+        print(f"ERFOLG: Datei gespeichert als '{local_filename}'")
+        
+        # Optional: Aufräumen
+        # cursor.execute(f"DROP TABLE {temp_table}")
+
+    except Exception as e:
+        print(f"Fehler: {e}")
+        print("(Prüfe Pfad, Schreibrechte und ob die Datei Text ist)")
+    finally:
+        if 'conn' in locals(): conn.close()
+
+if __name__ == "__main__":
+    fetch_ifs_content()
