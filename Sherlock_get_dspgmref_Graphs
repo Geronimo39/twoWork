@@ -1,0 +1,218 @@
+# -------   get_dspgmref:   -------
+import pyodbc
+import pandas as pd
+
+OBJTYPE_MAP = {
+    "*FILE": "FILE",
+    "*PGM": "PROGRAM",
+    "*SRVPGM": "SERVICE_PROGRAM",
+    "*CMD": "COMMAND",
+    "*DSPF": "DISPLAY_FILE",
+    "*PRTF": "PRINTER_FILE",
+    "*MOD": "MODULE",
+    "*MENU": "MENU",
+    "*MSGF": "MESSAGE_FILE",
+    "F": "FILE",
+    "P": "PROGRAM",
+    "D": "DEVICE",
+}
+
+USAGE_MAP = {
+    0: "UNKNOWN",
+    1: "INPUT",
+    2: "OUTPUT",
+    3: "UPDATE",
+    4: "INPUT_UPDATE",
+    5: "DELETE",
+    6: "INPUT_DELETE",
+    7: "OUTPUT_UPDATE",
+    8: "OPEN",
+    9: "CLOSE",
+    11: "EXECUTE",
+}
+
+def get_dspgmref(target_lib, system_name, user, pwd):
+    conn_str = f"DRIVER={{IBM i Access ODBC Driver}};SYSTEM={system_name};UID={user};PWD={pwd};"
+    conn = pyodbc.connect(conn_str, autocommit=True)
+    cursor = conn.cursor()
+
+    cmd = f"DSPPGMREF PGM({target_lib}/*ALL) OUTPUT(*OUTFILE) OUTFILE(QTEMP/PGMREFS)"
+    cursor.execute(f"CALL QSYS2.QCMDEXC('{cmd}')")
+
+    df_raw = pd.read_sql("SELECT * FROM QTEMP.PGMREFS", conn)
+    conn.close()
+
+    # Spalten prüfen
+    required = ["WHPNAM", "WHFUSG"]
+    if not all(col in df_raw.columns for col in required):
+        raise ValueError("Erforderliche Spalten fehlen in QTEMP/PGMREFS")
+
+    # Zielobjekt-Spalte ermitteln
+    target_candidates = ["WHFNAM", "WHFMAN", "WHFMAM"]
+    target_obj_col = next((c for c in target_candidates if c in df_raw.columns), None)
+    if not target_obj_col:
+        raise ValueError("Keine Zielobjekt-Spalte gefunden (WHFNAM, WHFMAN, WHFMAM)")
+
+    # Objekttyp-Spalte ermitteln
+    objtype_candidates = ["WHOBT", "WHOTYP"]
+    objtype_col = next((c for c in objtype_candidates if c in df_raw.columns), None)
+    if not objtype_col:
+        raise ValueError("Keine Objekttyp-Spalte gefunden (WHOBT, WHOTYP)")
+
+    df = pd.DataFrame()
+    df["caller_pgm"] = df_raw["WHPNAM"].astype(str).str.strip().str.upper()
+    df["target_obj"] = df_raw[target_obj_col].astype(str).str.strip().str.upper()
+    df["target_objtype_code"] = df_raw[objtype_col].astype(str).str.strip().str.upper()
+    df["usage_code"] = pd.to_numeric(df_raw["WHFUSG"], errors="coerce").astype("Int64")
+
+    df["target_objtype"] = df["target_objtype_code"].map(OBJTYPE_MAP).fillna(df["target_objtype_code"])
+    df["usage"] = df["usage_code"].map(USAGE_MAP).fillna("USG_" + df["usage_code"].astype(str))
+
+    df["caller_full"] = df["caller_pgm"]
+    df["target_full"] = df["target_obj"]
+
+    df = df.dropna(subset=["caller_pgm", "target_obj", "target_objtype_code"]).reset_index(drop=True)
+    return df
+
+
+# -------   CALLGraph (Prgm -> Prgm):   -------
+import networkx as nx
+import matplotlib.pyplot as plt
+
+def graph_call(df, title="CALL-Graph (Programme → Programme)"):
+    df_call = df[df["target_objtype"] == "PROGRAM"]
+
+    if df_call.empty:
+        print("Keine CALL-Referenzen gefunden.")
+        return
+
+    G = nx.DiGraph()
+
+    for _, row in df_call.iterrows():
+        caller = row["caller_pgm"]
+        callee = row["target_obj"]
+        G.add_node(caller, type="PROGRAM")
+        G.add_node(callee, type="PROGRAM")
+        G.add_edge(caller, callee)
+
+    plt.figure(figsize=(14, 10))
+    pos = nx.spring_layout(G, k=0.8, iterations=50)
+
+    nx.draw(
+        G, pos,
+        with_labels=True,
+        node_size=1800,
+        node_color="#4C72B0",
+        font_size=9,
+        font_weight="bold",
+        edge_color="black",
+        arrows=True,
+        arrowsize=14
+    )
+
+    plt.title(title)
+    plt.show()
+
+# -------   DATAGraph (Prgm -> File):   -------
+def graph_data(df, title="DATA-Graph (Programme → Files)"):
+    df_data = df[df["target_objtype"] == "FILE"]
+
+    if df_data.empty:
+        print("Keine Datei-Referenzen gefunden.")
+        return
+
+    G = nx.DiGraph()
+
+    usage_colors = {
+        "INPUT": "blue",
+        "OUTPUT": "red",
+        "UPDATE": "orange",
+        "DELETE": "purple",
+        "INPUT_UPDATE": "green",
+        "INPUT_DELETE": "brown",
+        "OUTPUT_UPDATE": "pink",
+        "OPEN": "gray",
+        "CLOSE": "black",
+        "UNKNOWN": "lightgray"
+    }
+
+    for _, row in df_data.iterrows():
+        caller = row["caller_pgm"]
+        target = row["target_obj"]
+        usage = row["usage"]
+
+        G.add_node(caller, type="PROGRAM")
+        G.add_node(target, type="FILE")
+        G.add_edge(caller, target, usage=usage)
+
+    pos = nx.spring_layout(G, k=0.9, iterations=60)
+
+    plt.figure(figsize=(16, 12))
+
+    program_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "PROGRAM"]
+    file_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "FILE"]
+
+    nx.draw_networkx_nodes(G, pos, nodelist=program_nodes, node_shape="s",
+                           node_color="#4C72B0", node_size=1600)
+    nx.draw_networkx_nodes(G, pos, nodelist=file_nodes, node_shape="o",
+                           node_color="#55A868", node_size=1600)
+
+    edge_colors = [usage_colors.get(G[u][v]["usage"], "black") for u, v in G.edges()]
+    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, arrows=True, arrowsize=14)
+
+    nx.draw_networkx_labels(G, pos, font_size=9, font_weight="bold")
+
+    plt.title(title)
+    plt.show()
+
+# -------   UIGraph (Prgm -> Device):   -------
+def graph_ui(df, title="UI-Graph (Programme → Device-Files)"):
+    df_ui = df[df["target_objtype"] == "DEVICE"]
+
+    if df_ui.empty:
+        print("Keine UI-Referenzen gefunden.")
+        return
+
+    G = nx.DiGraph()
+
+    for _, row in df_ui.iterrows():
+        caller = row["caller_pgm"]
+        target = row["target_obj"]
+
+        G.add_node(caller, type="PROGRAM")
+        G.add_node(target, type="DEVICE")
+        G.add_edge(caller, target)
+
+    pos = nx.spring_layout(G, k=0.9, iterations=60)
+
+    plt.figure(figsize=(16, 12))
+
+    program_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "PROGRAM"]
+    device_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "DEVICE"]
+
+    nx.draw_networkx_nodes(G, pos, nodelist=program_nodes, node_shape="s",
+                           node_color="#4C72B0", node_size=1600)
+    nx.draw_networkx_nodes(G, pos, nodelist=device_nodes, node_shape="o",
+                           node_color="#F1C40F", node_size=1600)
+
+    nx.draw_networkx_edges(G, pos, arrows=True, arrowsize=14)
+    nx.draw_networkx_labels(G, pos, font_size=9, font_weight="bold")
+
+    plt.title(title)
+    plt.show()
+
+# -------   Dispatcher:   -------
+def dispatcher(df, do_call=False, do_data=False, do_ui=False):
+    if do_call:
+        graph_call(df)
+    if do_data:
+        graph_data(df)
+    if do_ui:
+        graph_ui(df)
+
+
+# ------- finally: Call
+
+if __name__ == '__main__':
+    df = get_dspgmref(...)
+    dispatcher(df, do_call=True)
