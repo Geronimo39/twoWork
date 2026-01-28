@@ -1,0 +1,59 @@
+def graph_combined_for_program(df, program_name, title=None):
+    import networkx as nx
+    import matplotlib.pyplot as plt
+
+    df_sub = df[df["caller_pgm"] == program_name.upper()]
+    if df_sub.empty:
+        print(f"Keine Referenzen für Programm '{program_name}' gefunden.")
+        return
+
+    G = nx.DiGraph()
+
+    usage_colors = {
+        "INPUT": "blue",
+        "OUTPUT": "red",
+        "UPDATE": "orange",
+        "DELETE": "purple",
+        "INPUT_UPDATE": "green",
+        "INPUT_DELETE": "brown",
+        "OUTPUT_UPDATE": "pink",
+        "OPEN": "gray",
+        "CLOSE": "black",
+        "EXECUTE": "black",
+        "UNKNOWN": "lightgray"
+    }
+
+    for _, row in df_sub.iterrows():
+        caller = row["caller_pgm"]
+        target = row["target_obj"]
+        objtype = row["target_objtype"]
+        usage = row["usage"]
+
+        G.add_node(caller, type="PROGRAM")
+        G.add_node(target, type=objtype)
+        G.add_edge(caller, target, usage=usage)
+
+    pos = nx.spring_layout(G, k=1.0, iterations=70)
+    plt.figure(figsize=(14, 10))
+
+    program_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "PROGRAM"]
+    file_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "FILE"]
+    service_nodes = [n for n, d in G.nodes(data=True) if d["type"] == "SERVICE_PROGRAM"]
+    other_nodes = [n for n, d in G.nodes(data=True)
+                   if d["type"] not in ("PROGRAM", "FILE", "SERVICE_PROGRAM")]
+
+    nx.draw_networkx_nodes(G, pos, nodelist=program_nodes, node_shape="s",
+                           node_color="#4C72B0", node_size=1600)
+    nx.draw_networkx_nodes(G, pos, nodelist=file_nodes, node_shape="o",
+                           node_color="#55A868", node_size=1600)
+    nx.draw_networkx_nodes(G, pos, nodelist=service_nodes, node_shape="d",
+                           node_color="#C44E52", node_size=1600)
+    nx.draw_networkx_nodes(G, pos, nodelist=other_nodes, node_shape="^",
+                           node_color="#F1C40F", node_size=1600)
+
+    edge_colors = [usage_colors.get(G[u][v]["usage"], "black") for u, v in G.edges()]
+    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, arrows=True, arrowsize=14)
+    nx.draw_networkx_labels(G, pos, font_size=9, font_weight="bold")
+
+    plt.title(title or f"Referenzen für Programm: {program_name}")
+    plt.show()
