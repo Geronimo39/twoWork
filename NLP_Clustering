@@ -1,0 +1,153 @@
+import os
+import re
+import glob
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+
+# ---------------------------------------------------------
+# KONFIGURATION
+# ---------------------------------------------------------
+COMMENT_DIR = r"PFAD/ZU/DEINEN/COMMENT_TXT_FILES"  # z.B. r"C:\IBM_i\comments"
+N_CLUSTERS = 12   # Anzahl der Themencluster (anpassbar)
+MIN_DOC_LENGTH = 10  # minimale Zeichenanzahl, damit ein File berücksichtigt wird
+# ---------------------------------------------------------
+
+
+def load_comment_files(comment_dir):
+    records = []
+    pattern = os.path.join(comment_dir, "*.txt")
+    for path in glob.glob(pattern):
+        prog_name = os.path.splitext(os.path.basename(path))[0]
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+        except UnicodeDecodeError:
+            with open(path, "r", encoding="latin-1", errors="ignore") as f:
+                text = f.read()
+
+        text = text.strip()
+        if len(text) < MIN_DOC_LENGTH:
+            continue
+
+        records.append({"program": prog_name, "text": text})
+
+    df = pd.DataFrame(records)
+    print(f"{len(df)} Kommentar-Dateien geladen.")
+    return df
+
+
+def preprocess_text(text):
+    # Lowercase
+    text = text.lower()
+    # Sonderzeichen entfernen, nur Buchstaben/Zahlen und Leerzeichen
+    text = re.sub(r"[^a-z0-9äöüß\s]", " ", text)
+    # Mehrfache Leerzeichen reduzieren
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def build_tfidf_matrix(df):
+    df["clean_text"] = df["text"].apply(preprocess_text)
+
+    vectorizer = TfidfVectorizer(
+        max_features=5000,
+        ngram_range=(1, 2),
+        stop_words=None  # ggf. deutsche Stopwords ergänzen
+    )
+
+    X = vectorizer.fit_transform(df["clean_text"])
+    print(f"TF-IDF-Matrix: {X.shape[0]} Dokumente, {X.shape[1]} Features.")
+    return X, vectorizer
+
+
+def run_clustering(X, n_clusters):
+    km = KMeans(
+        n_clusters=n_clusters,
+        random_state=42,
+        n_init="auto"
+    )
+    labels = km.fit_predict(X)
+    print("Clustering abgeschlossen.")
+    return km, labels
+
+
+def top_terms_per_cluster(km, vectorizer, n_terms=10):
+    feature_names = np.array(vectorizer.get_feature_names_out())
+    centers = km.cluster_centers_
+
+    cluster_terms = {}
+    for cluster_id in range(centers.shape[0]):
+        center = centers[cluster_id]
+        top_idx = center.argsort()[::-1][:n_terms]
+        terms = feature_names[top_idx]
+        cluster_terms[cluster_id] = terms
+
+    return cluster_terms
+
+
+def visualize_clusters_2d(X, labels, df):
+    pca = PCA(n_components=2, random_state=42)
+    coords = pca.fit_transform(X.toarray())
+
+    plt.figure(figsize=(12, 8))
+    scatter = plt.scatter(
+        coords[:, 0],
+        coords[:, 1],
+        c=labels,
+        cmap="tab20",
+        alpha=0.7,
+        s=20
+    )
+
+    plt.title("CL/RPG-Kommentare – Cluster-Visualisierung (PCA)")
+    plt.xlabel("PCA 1")
+    plt.ylabel("PCA 2")
+    plt.colorbar(scatter, label="Cluster-ID")
+    plt.tight_layout()
+    plt.show()
+
+
+def main():
+    # 1. Kommentare laden
+    df = load_comment_files(COMMENT_DIR)
+    if df.empty:
+        print("Keine gültigen Kommentar-Dateien gefunden.")
+        return
+
+    # 2. TF-IDF-Matrix bauen
+    X, vectorizer = build_tfidf_matrix(df)
+
+    # 3. Clustering
+    km, labels = run_clustering(X, N_CLUSTERS)
+    df["cluster"] = labels
+
+    # 4. Top-Terme je Cluster
+    cluster_terms = top_terms_per_cluster(km, vectorizer, n_terms=12)
+
+    print("\nTop-Begriffe je Cluster:")
+    for cid, terms in cluster_terms.items():
+        print(f"\nCluster {cid}:")
+        print(", ".join(terms))
+
+    # 5. Beispielprogramme je Cluster
+    print("\nBeispielprogramme je Cluster:")
+    for cid in sorted(df["cluster"].unique()):
+        subset = df[df["cluster"] == cid].head(5)
+        progs = ", ".join(subset["program"].tolist())
+        print(f"Cluster {cid}: {progs}")
+
+    # 6. 2D-Visualisierung
+    visualize_clusters_2d(X, labels, df)
+
+    # 7. Ergebnisse speichern
+    df.to_excel("IBM_i_Comment_Clusters.xlsx", index=False)
+    print("\nErgebnisse gespeichert in: IBM_i_Comment_Clusters.xlsx")
+
+
+if __name__ == "__main__":
+    main()
