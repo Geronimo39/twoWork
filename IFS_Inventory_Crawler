@@ -1,0 +1,145 @@
+import os
+import pandas as pd
+import time
+import datetime
+
+# --- KONFIGURATION ---------------------------------------------------------
+# Pfad zum verbundenen Netzlaufwerk (IFS)
+# WICHTIG: Nutze '/' statt '\' auch unter Windows, das macht weniger Ärger.
+ROOT_PATH = 'Z:/' 
+
+# Welche Dateiendungen interessieren uns für den Inhalt?
+# '*' bedeutet: Lies ALLES (Vorsicht bei riesigen Binärdateien!)
+# ['.java', '.xml', '.txt'] bedeutet: Nur diese lesen
+CONTENT_FILTER = ['.java', '.jar', '.class', '.xml', '.properties', '.sh', '.txt', '.rpgle', '.clp']
+
+# Maximale Dateigröße zum Lesen in Bytes (z.B. 1 MB), um Speicherüberlauf zu meiden
+MAX_READ_SIZE = 1024 * 1024 
+
+OUTPUT_EXCEL = 'IFS_Scan_Result.xlsx'
+# ---------------------------------------------------------------------------
+
+def read_file_content(filepath):
+    """
+    Versucht, den Inhalt einer Datei zu lesen (Flattening).
+    Ignoriert Binärdateien oder Encoding-Fehler.
+    """
+    try:
+        # Check Größe
+        if os.path.getsize(filepath) > MAX_READ_SIZE:
+            return "[SKIP] Datei zu groß für Vorschau"
+
+        # Wir versuchen es mit 'utf-8' und Fallback auf 'latin-1' (häufig bei IBM i)
+        try:
+            with open(filepath, 'r', encoding='utf-8', errors='strict') as f:
+                return f.read()
+        except UnicodeDecodeError:
+            with open(filepath, 'r', encoding='latin-1', errors='replace') as f:
+                return f.read()
+                
+    except Exception as e:
+        return f"[ERROR] Lesefehler: {e}"
+
+def scan_network_drive():
+    print(f"--- Starte IFS Scan auf {ROOT_PATH} ---")
+    print("Modus: os.scandir (High Performance)")
+    
+    findings = []
+    access_denied = []
+    stats = {'files': 0, 'dirs': 0, 'errors': 0}
+    
+    start_time = time.time()
+
+    # Wir nutzen einen Stack für iterative Suche (statt Rekursion), 
+    # das ist stabiler bei tiefen Strukturen.
+    # Stack speichert Pfade, die noch gescannt werden müssen.
+    stack = [ROOT_PATH]
+
+    while stack:
+        current_dir = stack.pop()
+        
+        try:
+            # os.scandir ist der Turbo für Netzwerke
+            with os.scandir(current_dir) as entries:
+                for entry in entries:
+                    try:
+                        # 1. Ist es ein Ordner?
+                        if entry.is_dir(follow_symlinks=False): 
+                            # WICHTIG: follow_symlinks=False verhindert die Endlosschleifen,
+                            # die die AS400 gestern gekillt haben!
+                            stack.append(entry.path)
+                            stats['dirs'] += 1
+                        
+                        # 2. Ist es eine Datei?
+                        elif entry.is_file(follow_symlinks=False):
+                            stats['files'] += 1
+                            ext = os.path.splitext(entry.name)[1].lower()
+                            
+                            # Prüfen, ob relevant
+                            if ext in CONTENT_FILTER or '*' in CONTENT_FILTER:
+                                # Inhalt holen? (Nur bei Text-Verdacht)
+                                # Wir lesen keine .jar/.class binär ein, das macht keinen Sinn als Text
+                                content = ""
+                                if ext not in ['.jar', '.class', '.exe', '.zip']:
+                                    content = read_file_content(entry.path)
+                                else:
+                                    content = "[BINARY] Inhalt nicht lesbar"
+
+                                findings.append({
+                                    'Pfad': entry.path,
+                                    'Dateiname': entry.name,
+                                    'Endung': ext,
+                                    'Größe_Bytes': entry.stat().st_size,
+                                    'Inhalt_Preview': content[:32000] # Excel Limit beachten
+                                })
+                                
+                                # Kleines Feedback alle 100 Dateien
+                                if stats['files'] % 100 == 0:
+                                    print(f"   ... {stats['files']} Dateien gescannt ...")
+
+                    except PermissionError:
+                        # Zugriff auf EINZELNES Objekt verweigert
+                        access_denied.append({'Pfad': entry.path, 'Typ': 'Objekt'})
+                        stats['errors'] += 1
+                    except Exception as e:
+                        print(f"Fehler bei {entry.path}: {e}")
+
+        except PermissionError:
+            # Zugriff auf den GANZEN ORDNER verweigert
+            access_denied.append({'Pfad': current_dir, 'Typ': 'Ordner (Zugriff verweigert)'})
+            stats['errors'] += 1
+            print(f"   [BLOCK] Kein Zugriff auf: {current_dir}")
+        
+        except Exception as e:
+            print(f"Fehler beim Öffnen von {current_dir}: {e}")
+
+    # --- ABSCHLUSS & EXPORT ---
+    duration = time.time() - start_time
+    print("-" * 50)
+    print(f"FERTIG in {duration:.2f} Sekunden.")
+    print(f"Gescannte Ordner: {stats['dirs']}")
+    print(f"Gescannte Dateien: {stats['files']}")
+    print(f"Blockierte Pfade: {stats['errors']}")
+
+    # Ergebnisse speichern
+    print("Speichere Excel...")
+    
+    with pd.ExcelWriter(OUTPUT_EXCEL) as writer:
+        # Blatt 1: Die Funde
+        if findings:
+            df_find = pd.DataFrame(findings)
+            df_find.to_excel(writer, sheet_name='Gefundene_Dateien', index=False)
+        
+        # Blatt 2: Die verweigerten Zugriffe (Wichtig für deinen Bericht!)
+        if access_denied:
+            df_denied = pd.DataFrame(access_denied)
+            df_denied.to_excel(writer, sheet_name='Zugriff_Verweigert', index=False)
+
+    print(f"Daten gesichert in: {OUTPUT_EXCEL}")
+
+if __name__ == "__main__":
+    if os.path.exists(ROOT_PATH):
+        scan_network_drive()
+    else:
+        print(f"FEHLER: Laufwerk {ROOT_PATH} nicht gefunden.")
+        print("Bitte verbinde das IFS zuerst als Netzlaufwerk.")
