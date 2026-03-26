@@ -1,0 +1,116 @@
+# ===========================================================================
+# IFS_Inquiry_SCAN.ipynb  —  Notebook-Code (in Zellen aufteilen wie unten)
+# Beide Dateien müssen im selben Ordner liegen:
+#   ifs_scan_worker.py
+#   IFS_Inquiry_SCAN.ipynb
+# ===========================================================================
+
+
+# ── ZELLE 1: Konfiguration ──────────────────────────────────────────────────
+# !! Hier die Pfade anpassen, sonst nichts !!
+
+SRCS        = [r'C:\Users\stefa']  # Startverzeichnis(se)
+OUTPUT_PATH = r'C:\Users\stefa\01_MyDocs\FileScans'      # Ausgabeordner für CSV
+
+MAX_PROCS   = 4     # Anzahl Prozesse  — für lokalen Test ruhig auf 2 reduzieren
+MAX_THREADS = 16    # Threads pro Prozess
+SKIP_PREFIX = ('core',)
+
+
+# ── ZELLE 2: Imports ────────────────────────────────────────────────────────
+
+import os
+import sys
+import pandas as pd
+from datetime import datetime
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+# Worker-Modul muss im selben Ordner liegen wie dieses Notebook
+sys.path.insert(0, os.path.dirname(os.path.abspath('__file__')))
+from Doing_FileScan_wrkr import scan_root, get_root_dirs
+
+print("Imports OK")
+
+
+# ── ZELLE 3: Root-Verzeichnisse ermitteln ───────────────────────────────────
+
+print("=" * 60)
+print("IFS Scan gestartet")
+print("=" * 60)
+
+print("\n[1/3] Ermittle Root-Verzeichnisse ...")
+root_dirs = []
+for src in SRCS:
+    found = get_root_dirs(src, skip_prefix=SKIP_PREFIX)
+    root_dirs.extend(found)
+    print(f"      {src}  →  {len(found)} Unterverzeichnisse gefunden")
+
+print(f"\n      Gesamt : {len(root_dirs)} Root-Verzeichnisse")
+print(f"      Einträge: {root_dirs[:6]}")
+
+
+# ── ZELLE 4: Paralleler Scan ────────────────────────────────────────────────
+# WICHTIG: ProcessPoolExecutor in Jupyter NUR innerhalb von
+#          if __name__ == '__main__' oder — wie hier — direkt in der Zelle.
+#          Funktioniert auf Windows nur weil die Worker-Funktionen
+#          in ifs_scan_worker.py (importierbar) liegen, nicht im Notebook!
+
+print(f"\n[2/3] Starte Scan: {MAX_PROCS} Prozesse × {MAX_THREADS} Threads ...")
+t_start     = datetime.now()
+all_entries = []
+all_errors  = {}
+
+with ProcessPoolExecutor(max_workers=MAX_PROCS) as proc_pool:
+    futures = {proc_pool.submit(scan_root, d): d for d in root_dirs}
+
+    for i, fut in enumerate(as_completed(futures), 1):
+        path = futures[fut]
+        try:
+            entries, errors = fut.result()
+            all_entries.extend(entries)
+            all_errors.update(errors)
+            print(f"      [{i:>3}/{len(root_dirs)}]  {path:<40}  {len(entries):>8,} Dateien")
+        except Exception as e:
+            print(f"      [{i:>3}/{len(root_dirs)}]  FEHLER in {path}: {e}")
+
+elapsed = (datetime.now() - t_start).total_seconds()
+print(f"\n      Scan fertig in {elapsed:.1f}s")
+print(f"      Dateien gesamt   : {len(all_entries):,}")
+print(f"      Fehlerhafte Pfade: {len(all_errors)}")
+
+
+# ── ZELLE 5: DataFrame bauen und exportieren ────────────────────────────────
+
+print(f"\n[3/3] Baue DataFrame und exportiere ...")
+
+df = pd.DataFrame(all_entries)
+df = df.sort_values('Path').reset_index(drop=True)
+
+# Spaltenreihenfolge sicherstellen
+cols = ['Name', 'Path', 'ext', 'Type', 'Inode', 'IO_Nbr',
+        'NbrLinks', 'UID', 'GrID', 'Size_MB',
+        'MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']
+df = df[cols]
+
+out_csv = os.path.join(OUTPUT_PATH, 'IFS_scan.csv')
+df.to_csv(out_csv, sep=';', encoding='utf-8', index=False)
+
+print(f"      CSV gespeichert : {out_csv}")
+print(f"      Zeilen          : {len(df):,}")
+print(f"      Spalten         : {list(df.columns)}")
+
+# Fehler-Log (nur wenn nötig)
+if all_errors:
+    err_df = pd.DataFrame(list(all_errors.items()), columns=['path', 'error'])
+    err_path = os.path.join(OUTPUT_PATH, 'IFS_scan_errors.csv')
+    err_df.to_csv(err_path, sep=';', encoding='utf-8', index=False)
+    print(f"\n      Fehler-Log      : {err_path}  ({len(all_errors)} Einträge)")
+
+print("\n" + "=" * 60)
+print(f"Fertig! Laufzeit: {elapsed:.1f}s")
+print("=" * 60)
+
+
+# ── ZELLE 6: Erste Zeilen anzeigen (optional) ───────────────────────────────
+
+df.head(10)
