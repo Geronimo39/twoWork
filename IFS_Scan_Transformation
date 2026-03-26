@@ -1,0 +1,167 @@
+# ===========================================================================
+# IFS_Scan_Transformation.ipynb
+#
+# Zweck: Transformiert den rohen IFS-Scan-DataFrame in das Format,
+#        das das Dashboard (IFS_Analyse_Dashboard_repariert.ipynb) erwartet.
+#
+# Spalten IFS-Scan (Output):
+#   Name, Path, ext, Type, Inode, IO_Nbr, NbrLinks, UID, GrID,
+#   Size_MB, MRAcc_Tme, MRMod_Tme, MRCr_Tme
+#
+# Spalten Dashboard (erwartet):
+#   Name, Path, ext, Size, MRCr_Tme, MRMod_Tme, MRAcc_Tme (als datetime!)
+#   + alter_tage  (wird hier vorberechnet)
+# ===========================================================================
+
+
+# ── ZELLE 1: Imports ────────────────────────────────────────────────────────
+
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import os
+
+print("Imports OK")
+
+
+# ── ZELLE 2: Daten einlesen ─────────────────────────────────────────────────
+# Pfad zur CSV anpassen, die vom IFS-Scan erzeugt wurde
+
+CSV_PATH = r'C:\Users\DeinName\Desktop\IFS_scan.csv'   # !! anpassen !!
+
+df_raw = pd.read_csv(CSV_PATH, sep=';', encoding='utf-8')
+
+print(f"Eingelesen: {len(df_raw):,} Zeilen")
+print(f"Spalten   : {list(df_raw.columns)}")
+print(f"\nDatentypen:")
+print(df_raw.dtypes)
+print(f"\nErste Zeile zur Kontrolle:")
+print(df_raw.head(1).T)
+
+
+# ── ZELLE 3: Transformation ─────────────────────────────────────────────────
+#
+# Das ist die eigentliche Kernzelle.
+# Alle "tricky" Punkte sind hier kommentiert.
+
+ef = df_raw.copy()
+
+# ── TRICK 1: Zeitstempel-Spalten ────────────────────────────────────────────
+#
+# Der IFS-Scan speichert die Zeitstempel als STRING im Format 'YYYY-MM-DD HH:MM'
+# (z.B. '2023-04-15 08:30').
+# Das Dashboard braucht echte pandas-datetime-Objekte, damit .dt.year,
+# .dt.month, .dt.days usw. funktionieren.
+#
+# WICHTIG: pd.to_datetime() mit format= angeben — das ist ca. 10× schneller
+# als automatische Erkennung bei großen DataFrames (Millionen Zeilen)!
+# errors='coerce' → ungültige Werte werden NaT (statt Exception).
+
+TIME_FORMAT = '%Y-%m-%d %H:%M'
+
+for col in ['MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']:
+    ef[col] = pd.to_datetime(ef[col], format=TIME_FORMAT, errors='coerce')
+
+# Prüfen ob NaT-Werte entstanden sind (deutet auf Format-Abweichungen hin)
+for col in ['MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']:
+    nat_count = ef[col].isna().sum()
+    if nat_count > 0:
+        print(f"⚠️  {col}: {nat_count:,} ungültige Zeitstempel (NaT) — bitte prüfen!")
+    else:
+        print(f"✅ {col}: alle Zeitstempel OK")
+
+# ── TRICK 2: Spalte 'Size' ───────────────────────────────────────────────────
+#
+# Der IFS-Scan liefert 'Size_MB' (bereits in MB).
+# Das Dashboard erwartet die Spalte 'Size' — ebenfalls in MB.
+# Einfach umbenennen, KEINE Umrechnung nötig.
+
+ef = ef.rename(columns={'Size_MB': 'Size'})
+
+# ── TRICK 3: 'alter_tage' vorberechnen ──────────────────────────────────────
+#
+# Das Dashboard berechnet alter_tage selbst — aber erst NACH dem Einlesen.
+# Wir berechnen es hier bereits, damit alle Folge-Zellen direkt funktionieren.
+# Referenzdatum = jetzt (Zeitpunkt der Transformation)
+#
+# ACHTUNG: pd.Timestamp.now() ist timezone-naive.
+# Falls MRMod_Tme timezone-aware wäre (z.B. durch UTC-Offset im IFS),
+# müsste man .tz_localize(None) ergänzen — auf dem AS400-IFS normalerweise
+# nicht nötig, aber hier als Sicherheitsnetz eingebaut.
+
+now = pd.Timestamp.now()
+
+if ef['MRMod_Tme'].dt.tz is not None:
+    # Timezone entfernen falls vorhanden (AS400-IFS Sonderfall)
+    ef['MRMod_Tme'] = ef['MRMod_Tme'].dt.tz_localize(None)
+    print("ℹ️  Timezone aus MRMod_Tme entfernt")
+
+ef['alter_tage'] = (now - ef['MRMod_Tme']).dt.days
+
+# Negative Werte abfangen (Systemuhr-Anomalien auf AS400 möglich!)
+neg_count = (ef['alter_tage'] < 0).sum()
+if neg_count > 0:
+    print(f"⚠️  {neg_count:,} Dateien mit negativem Alter (Systemuhr-Anomalie?) — auf 0 gesetzt")
+    ef['alter_tage'] = ef['alter_tage'].clip(lower=0)
+else:
+    print(f"✅ alter_tage: alle Werte plausibel (min={ef['alter_tage'].min()}, max={ef['alter_tage'].max()})")
+
+# ── TRICK 4: ext-Spalte bereinigen ──────────────────────────────────────────
+#
+# Der IFS-Scan liefert bereits eine 'ext'-Spalte (Leerzeichen für keine Ext.).
+# Das Dashboard-Notebook setzt bei fehlendem '.' den Wert '(kein)'.
+# Wir vereinheitlichen das hier.
+
+ef['ext'] = ef['ext'].fillna('').str.strip()
+ef.loc[ef['ext'] == '', 'ext'] = '(kein)'
+
+# ── TRICK 5: Path auf Verzeichnis-Ebene reduzieren ──────────────────────────
+#
+# Der IFS-Scan liefert in 'Path' den VOLLEN Dateipfad inkl. Dateiname.
+# Das Dashboard gruppiert nach 'Path' als Verzeichnis.
+# → Wir leiten 'Path' als Elternverzeichnis ab.
+#
+# Beispiel:
+#   vorher : /ifs/home/user1/daten/bericht.pdf
+#   nachher: /ifs/home/user1/daten
+
+ef['Path'] = ef['Path'].apply(lambda p: os.path.dirname(str(p)))
+
+# ── ZELLE 4: Validierung ────────────────────────────────────────────────────
+
+print("\n" + "=" * 55)
+print("  VALIDIERUNG")
+print("=" * 55)
+print(f"  Zeilen gesamt       : {len(ef):,}")
+print(f"  Spalten             : {list(ef.columns)}")
+print(f"\n  Datentypen nach Transformation:")
+for col in ['Name', 'Path', 'ext', 'Size', 'alter_tage',
+            'MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']:
+    if col in ef.columns:
+        print(f"    {col:<15}: {ef[col].dtype}")
+    else:
+        print(f"    {col:<15}: ⚠️  FEHLT!")
+
+print(f"\n  Größen-Statistik (MB):")
+print(f"    min    : {ef['Size'].min():.4f}")
+print(f"    median : {ef['Size'].median():.4f}")
+print(f"    max    : {ef['Size'].max():.2f}")
+print(f"    Summe  : {ef['Size'].sum() / 1024:.2f} GB")
+
+print(f"\n  Zeitraum (MRMod_Tme):")
+print(f"    älteste Änderung : {ef['MRMod_Tme'].min()}")
+print(f"    jüngste Änderung : {ef['MRMod_Tme'].max()}")
+
+print(f"\n  NaT-Werte:")
+for col in ['MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']:
+    print(f"    {col:<15}: {ef[col].isna().sum():,}")
+
+print("=" * 55)
+print("  ✅ ef ist bereit für das Dashboard-Notebook")
+print("=" * 55)
+
+
+# ── ZELLE 5: Vorschau ───────────────────────────────────────────────────────
+
+ef[['Name', 'Path', 'ext', 'Size', 'alter_tage',
+    'MRMod_Tme', 'MRCr_Tme']].head(5)
