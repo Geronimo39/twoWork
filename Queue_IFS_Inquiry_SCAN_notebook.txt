@@ -1,0 +1,179 @@
+# ===========================================================================
+# IFS_Inquiry_SCAN.ipynb  —  Notebook-Code
+# Beide Dateien müssen im selben Ordner liegen:
+#   ifs_scan_worker.py
+#   IFS_Inquiry_SCAN.ipynb
+# ===========================================================================
+
+
+# ── ZELLE 1: Konfiguration ──────────────────────────────────────────────────
+# !! Hier die Pfade und Parameter anpassen !!
+
+SRCS        = [r'C:\Users\DeinName\Documents']  # Startverzeichnis(se)
+OUTPUT_PATH = r'C:\Users\DeinName\Desktop'      # Ausgabeordner für CSV
+
+MAX_PROCS   = os.cpu_count()      # Prozesse für große Dirs
+MAX_THREADS = os.cpu_count() * 4  # Threads pro Queue-Scan
+
+# Schwellwert: ab wieviel direkten Kindern gilt ein Dir als "groß"?
+# Empfehlung: 50 für lokale HDD, ggf. höher für AS400-IFS (dort tiefere Strukturen)
+SCHWELLWERT = 50
+
+SKIP_PREFIX = ('core',)
+
+# Worker-Modul konfigurieren
+import ifs_scan_worker as worker
+worker.MAX_THREADS = MAX_THREADS
+worker.SCHWELLWERT = SCHWELLWERT
+worker.SKIP_PREFIX = SKIP_PREFIX
+
+
+# ── ZELLE 2: Imports ────────────────────────────────────────────────────────
+
+import os
+import sys
+import pandas as pd
+from datetime import datetime
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from threading import Thread
+
+sys.path.insert(0, os.path.dirname(os.path.abspath('__file__')))
+from ifs_scan_worker import (
+    get_root_dirs,
+    classify_root_dirs,
+    scan_with_queue,
+    scan_root_process,
+)
+
+print("Imports OK")
+
+
+# ── ZELLE 3: Root-Verzeichnisse ermitteln & klassifizieren ──────────────────
+
+print("=" * 60)
+print("IFS Scan — adaptiver Modus")
+print("=" * 60)
+
+print("\n[1/4] Ermittle Root-Verzeichnisse ...")
+root_dirs = []
+for src in SRCS:
+    found = get_root_dirs(src, skip_prefix=SKIP_PREFIX)
+    root_dirs.extend(found)
+    print(f"      {src}  →  {len(found)} Unterverzeichnisse")
+
+print(f"\n      Gesamt: {len(root_dirs)} Root-Verzeichnisse")
+
+print("\n[2/4] Klassifiziere Root-Verzeichnisse ...")
+kleine_dirs, grosse_dirs = classify_root_dirs(root_dirs, schwellwert=SCHWELLWERT)
+
+
+# ── ZELLE 4: Adaptiver Scan ─────────────────────────────────────────────────
+#
+# Strategie:
+#   GROSSE Dirs → je ein eigener Prozess, jeder mit dynamischer Queue + Threads
+#   KLEINE Dirs → ALLE gemeinsam in eine einzige dynamische Queue + Threads
+#                 (kein Overhead durch Prozess-Spawning für kleine Dirs)
+
+print(f"\n[3/4] Starte adaptiven Scan ...")
+t_start     = datetime.now()
+all_entries = []
+all_errors  = {}
+
+
+# ── Teil A: Kleine Dirs — gemeinsame Queue ──────────────────────────────────
+
+if kleine_dirs:
+    print(f"\n  [A] {len(kleine_dirs)} kleine Dirs → gemeinsame Queue ({MAX_THREADS} Threads) ...")
+
+    from queue import Queue
+    from threading import Lock
+    from ifs_scan_worker import _queue_worker
+
+    q       = Queue()
+    results = []
+    errors  = {}
+    lock    = Lock()
+
+    # Alle kleinen Dirs auf einmal in die Queue
+    for d in kleine_dirs:
+        q.put(d)
+
+    threads = [
+        Thread(target=_queue_worker, args=(q, results, errors, lock), daemon=True)
+        for _ in range(MAX_THREADS)
+    ]
+    for t in threads:
+        t.start()
+
+    q.join()
+
+    for _ in threads:
+        q.put(None)
+    for t in threads:
+        t.join()
+
+    all_entries.extend(results)
+    all_errors.update(errors)
+    print(f"      → {len(results):,} Dateien gefunden")
+
+
+# ── Teil B: Große Dirs — je eigener Prozess ─────────────────────────────────
+
+if grosse_dirs:
+    print(f"\n  [B] {len(grosse_dirs)} große Dirs → {MAX_PROCS} Prozesse ...")
+
+    with ProcessPoolExecutor(max_workers=MAX_PROCS) as proc_pool:
+        futures = {proc_pool.submit(scan_root_process, d): d for d in grosse_dirs}
+
+        for i, fut in enumerate(as_completed(futures), 1):
+            path = futures[fut]
+            try:
+                entries, errors = fut.result()
+                all_entries.extend(entries)
+                all_errors.update(errors)
+                print(f"      [{i:>3}/{len(grosse_dirs)}]  {path:<40}  {len(entries):>8,} Dateien")
+            except Exception as e:
+                print(f"      [{i:>3}/{len(grosse_dirs)}]  FEHLER in {path}: {e}")
+
+
+elapsed = (datetime.now() - t_start).total_seconds()
+print(f"\n  Scan fertig in {elapsed:.1f}s")
+print(f"  Dateien gesamt   : {len(all_entries):,}")
+print(f"  Fehlerhafte Pfade: {len(all_errors)}")
+
+
+# ── ZELLE 5: DataFrame bauen und exportieren ────────────────────────────────
+
+print(f"\n[4/4] Baue DataFrame und exportiere ...")
+
+df = pd.DataFrame(all_entries)
+df = df.sort_values('Path').reset_index(drop=True)
+
+# Spaltenreihenfolge sicherstellen
+cols = ['Name', 'Path', 'ext', 'Type', 'Inode', 'IO_Nbr',
+        'NbrLinks', 'UID', 'GrID', 'Size_MB',
+        'MRAcc_Tme', 'MRMod_Tme', 'MRCr_Tme']
+df = df[cols]
+
+out_csv = os.path.join(OUTPUT_PATH, 'IFS_scan.csv')
+df.to_csv(out_csv, sep=';', encoding='utf-8', index=False)
+
+print(f"  CSV gespeichert : {out_csv}")
+print(f"  Zeilen          : {len(df):,}")
+print(f"  Spalten         : {list(df.columns)}")
+
+# Fehler-Log (nur wenn nötig)
+if all_errors:
+    err_df = pd.DataFrame(list(all_errors.items()), columns=['path', 'error'])
+    err_path = os.path.join(OUTPUT_PATH, 'IFS_scan_errors.csv')
+    err_df.to_csv(err_path, sep=';', encoding='utf-8', index=False)
+    print(f"\n  Fehler-Log      : {err_path}  ({len(all_errors)} Einträge)")
+
+print("\n" + "=" * 60)
+print(f"Fertig! Laufzeit: {elapsed:.1f}s")
+print("=" * 60)
+
+
+# ── ZELLE 6: Erste Zeilen anzeigen (optional) ───────────────────────────────
+
+df.head(10)
