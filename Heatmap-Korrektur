@@ -1,0 +1,57 @@
+def plot_heatmap(delta_long: pd.DataFrame, id_col: str, top_products: int = 12, top_brokers: int = 30, title_prefix: str = ""):
+    # Nur notwendige Spalten
+    df = delta_long[[id_col, "produkt", "delta"]].copy()
+
+    # Delta sicher numerisch machen
+    df["delta"] = pd.to_numeric(df["delta"], errors="coerce").fillna(0)
+
+    # Leere IDs entfernen
+    df = df.dropna(subset=[id_col])
+
+    # Ranking der Produkte nach absoluter Gesamtbewegung
+    prod_rank = (
+        df.groupby("produkt")["delta"]
+        .apply(lambda s: s.abs().sum())
+        .sort_values(ascending=False)
+    )
+    top_prods = prod_rank.head(top_products).index
+
+    # Ranking der Vermittler nach absoluter Gesamtbewegung
+    broker_rank = (
+        df.groupby(id_col)["delta"]
+        .apply(lambda s: s.abs().sum())
+        .sort_values(ascending=False)
+    )
+    top_ids = broker_rank.head(top_brokers).index
+
+    # Filtern
+    m = df[df["produkt"].isin(top_prods) & df[id_col].isin(top_ids)].copy()
+
+    # ROBUST: pivot_table statt pivot
+    pivot = m.pivot_table(
+        index=id_col,
+        columns="produkt",
+        values="delta",
+        aggfunc="mean",
+        fill_value=0
+    )
+
+    # explizit numerisch / float
+    pivot = pivot.apply(pd.to_numeric, errors="coerce").fillna(0).astype(float)
+
+    max_abs = np.abs(pivot.to_numpy()).max()
+
+    plt.figure(figsize=(9, 5))
+    plt.imshow(
+        pivot.to_numpy(),
+        aspect="auto",
+        cmap="RdBu",
+        vmin=-max_abs,
+        vmax=max_abs
+    )
+    plt.colorbar(label="Delta")
+    plt.xticks(range(len(pivot.columns)), pivot.columns, rotation=45, ha="right")
+    plt.yticks(range(len(pivot.index)), pivot.index)
+    plt.title(f"{title_prefix}Heatmap Delta – Top {top_brokers} × Top {top_products}")
+    plt.tight_layout()
+    plt.show()
