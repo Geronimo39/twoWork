@@ -1,0 +1,744 @@
+# Vertriebsreporting – Zeitreihenanalyse für Wochenstatistiken (Sach & Leben)
+
+Dieses Notebook zeigt eine **vorstandstaugliche Blaupause** für die Analyse wöchentlicher Vertriebsdaten auf Basis von **Vermittlernummern** und **Produktstückzahlen**.
+
+## Zielbild
+Ausgehend von Deinen bisherigen **Delta-Analysen zwischen zwei Wochen** wird hier ein vollständiger Zeitreihenansatz aufgebaut:
+
+- wöchentliche Entwicklung auf Gesamt- und Produktebene
+- Trennung von **Sach** und **Leben**
+- Rolling Trends, Saisonalität und Volatilität
+- Top-Mover / Auffälligkeiten / Alerting
+- Vermittlerbezogene Zeitreihen-Sichten
+- einfache Forecasts für Management-Orientierung
+
+## Hinweise
+- Das Notebook arbeitet zunächst mit **Dummy-Daten**, die typische Vertriebsdynamiken simulieren.
+- Die Struktur ist so gewählt, dass sie später leicht auf reale Excel-Dateien umgestellt werden kann.
+- Die Visualisierungen sind auf **Management-Lesbarkeit** ausgelegt.
+# Falls nötig:
+# !pip install pandas numpy matplotlib seaborn statsmodels openpyxl
+
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib.ticker import FuncFormatter
+import seaborn as sns
+
+from statsmodels.tsa.seasonal import STL
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
+plt.rcParams["figure.figsize"] = (14, 6)
+plt.rcParams["axes.titlesize"] = 14
+plt.rcParams["axes.labelsize"] = 11
+plt.rcParams["legend.frameon"] = True
+plt.rcParams["axes.grid"] = True
+
+sns.set_theme(style="whitegrid")
+
+RNG = np.random.default_rng(42)
+## 1) Dummy-Daten erzeugen
+
+Die folgenden Daten simulieren ein realistisches Wochen-Reporting:
+
+- **104 Wochen** (zwei Jahre)
+- getrennte Vermittler für **Sach** und **Leben**
+- mehrere Produktsparten je Segment
+- Trend, Saison, Noise und einzelne Sonderereignisse
+- vermittlerspezifische Stärken / Schwächen
+
+Die Zielstruktur orientiert sich an Deinem bisherigen Setup:
+je Woche ein tabellarischer Bestand mit Vermittlernummer und Produktstückzahlen.
+def simulate_segment_data(
+    weeks=104,
+    start_date="2024-01-01",
+    broker_ids=None,
+    products=None,
+    segment_name="Sach",
+    season_strength=0.15,
+    trend_strength=0.20,
+    event_strength=0.30,
+    base_level=20,
+    broker_spread=0.45,
+    product_weights=None,
+    seed=42,
+):
+    rng = np.random.default_rng(seed)
+
+    if broker_ids is None:
+        broker_ids = [f"{segment_name[:2].upper()}{i:05d}" for i in range(1, 81)]
+    if products is None:
+        products = ["PROD_A", "PROD_B", "PROD_C", "PROD_D"]
+    if product_weights is None:
+        product_weights = np.ones(len(products)) / len(products)
+    else:
+        product_weights = np.array(product_weights) / np.sum(product_weights)
+
+    dates = pd.date_range(start=start_date, periods=weeks, freq="W-MON")
+    t = np.arange(weeks)
+
+    # allgemeines Markt-/Saison-Signal
+    trend = 1 + trend_strength * (t / max(1, weeks - 1))
+    season = 1 + season_strength * np.sin(2 * np.pi * t / 52)
+
+    # 2 Sondereffekte für Kampagnen / Aktionen / externe Einflüsse
+    events = np.ones(weeks)
+    if weeks > 30:
+        events[18:24] *= (1 + event_strength * 0.5)
+        events[70:76] *= (1 - event_strength * 0.4)
+
+    records = []
+
+    # vermittlerspezifische Produktneigung
+    broker_strength = pd.Series(
+        rng.lognormal(mean=np.log(base_level), sigma=broker_spread, size=len(broker_ids)),
+        index=broker_ids
+    )
+
+    broker_activity = pd.Series(
+        rng.uniform(0.75, 1.25, size=len(broker_ids)),
+        index=broker_ids
+    )
+
+    for broker in broker_ids:
+        broker_base = broker_strength.loc[broker]
+        broker_factor = broker_activity.loc[broker]
+
+        # vermittlerspezifische Schwerpunktverteilung
+        broker_mix = rng.dirichlet(alpha=2 + 8 * product_weights)
+
+        for i, dt in enumerate(dates):
+            week_scale = trend[i] * season[i] * events[i]
+            for p_idx, product in enumerate(products):
+                lam = broker_base * broker_factor * broker_mix[p_idx] * week_scale
+
+                # segmenttypische Unterschiede
+                if segment_name.lower() == "leben":
+                    lam *= 0.65  # typischerweise geringere Stückzahl, dafür wertiger
+                else:
+                    lam *= 1.00
+
+                # zusätzliche idiosynkratische Streuung
+                lam *= rng.uniform(0.85, 1.15)
+
+                value = rng.poisson(max(lam, 0.05))
+
+                records.append({
+                    "kw_datum": dt,
+                    "jahr": dt.isocalendar().year,
+                    "kw": int(dt.isocalendar().week),
+                    "segment": segment_name,
+                    "vermittler": broker,
+                    "produkt": product,
+                    "anzahl": int(value),
+                })
+
+    return pd.DataFrame(records)
+
+sach_products = ["SV_KFZ", "SV_HAUSRAT", "SV_WOHNGEBAEUDE", "SV_HAFTPFLICHT", "SV_UNFALL"]
+leben_products = ["LV_RISIKO", "LV_ALTERSVORSORGE", "LV_FONDS", "LV_BERUFSUNFAEHIGKEIT"]
+
+sach_broker_ids = [f"S{i:06d}" for i in range(100001, 100081)]
+leben_broker_ids = [f"L{i:06d}" for i in range(200001, 200061)]
+
+df_sach = simulate_segment_data(
+    weeks=104,
+    start_date="2024-01-01",
+    broker_ids=sach_broker_ids,
+    products=sach_products,
+    segment_name="Sach",
+    season_strength=0.18,
+    trend_strength=0.16,
+    event_strength=0.28,
+    base_level=22,
+    product_weights=[0.35, 0.18, 0.14, 0.20, 0.13],
+    seed=42
+)
+
+df_leben = simulate_segment_data(
+    weeks=104,
+    start_date="2024-01-01",
+    broker_ids=leben_broker_ids,
+    products=leben_products,
+    segment_name="Leben",
+    season_strength=0.12,
+    trend_strength=0.10,
+    event_strength=0.25,
+    base_level=14,
+    product_weights=[0.22, 0.33, 0.17, 0.28],
+    seed=123
+)
+
+df_long = pd.concat([df_sach, df_leben], ignore_index=True).sort_values(
+    ["segment", "vermittler", "kw_datum", "produkt"]
+).reset_index(drop=True)
+
+df_long.head()
+## 2) Zielstruktur wie im Realfall
+
+Im Realbetrieb liegen die Daten typischerweise **wochenweise breit** vor.
+Darum bauen wir aus dem Long-Format zusätzlich eine breite Wochenstruktur je Segment.
+
+Diese Strukturen entsprechen dem Muster:
+
+- `vermittler`
+- Produktspalten (`SV_*` bzw. `LV_*`)
+- eine Zeile pro Vermittler und Woche
+def long_to_weekly_wide(df_segment: pd.DataFrame) -> pd.DataFrame:
+    wide = (
+        df_segment.pivot_table(
+            index=["kw_datum", "jahr", "kw", "segment", "vermittler"],
+            columns="produkt",
+            values="anzahl",
+            aggfunc="sum",
+            fill_value=0
+        )
+        .reset_index()
+    )
+    wide.columns.name = None
+    return wide
+
+weekly_sach_wide = long_to_weekly_wide(df_long[df_long["segment"] == "Sach"])
+weekly_leben_wide = long_to_weekly_wide(df_long[df_long["segment"] == "Leben"])
+
+print("Sach wide:", weekly_sach_wide.shape)
+print("Leben wide:", weekly_leben_wide.shape)
+
+weekly_sach_wide.head()
+## 3) Hilfsfunktionen
+
+Im Notebook werden einige Helfer für Zeitreihenaggregation, Rolling Metriken, Deltas und Forecasts verwendet.
+def aggregate_weekly(df_long: pd.DataFrame, by=("segment", "produkt")) -> pd.DataFrame:
+    grp_cols = ["kw_datum"] + list(by)
+    out = (
+        df_long.groupby(grp_cols, as_index=False)["anzahl"]
+        .sum()
+        .sort_values("kw_datum")
+    )
+    return out
+
+def add_time_features(df: pd.DataFrame, value_col="anzahl", group_cols=None, windows=(4, 13)):
+    if group_cols is None:
+        group_cols = []
+    df = df.sort_values(group_cols + ["kw_datum"]).copy()
+
+    for w in windows:
+        df[f"roll_mean_{w}"] = (
+            df.groupby(group_cols, dropna=False)[value_col]
+            .transform(lambda s: s.rolling(w, min_periods=1).mean())
+        )
+        df[f"roll_std_{w}"] = (
+            df.groupby(group_cols, dropna=False)[value_col]
+            .transform(lambda s: s.rolling(w, min_periods=2).std())
+        )
+    df["delta_1w"] = df.groupby(group_cols, dropna=False)[value_col].diff(1)
+    df["delta_pct_1w"] = df.groupby(group_cols, dropna=False)[value_col].pct_change(1)
+    return df
+
+def kpi_table(df_long: pd.DataFrame) -> pd.DataFrame:
+    base = (
+        df_long.groupby("segment")
+        .agg(
+            vermittler=("vermittler", "nunique"),
+            produkte=("produkt", "nunique"),
+            beobachtungen=("anzahl", "size"),
+            gesamt_absatz=("anzahl", "sum"),
+            mittlere_wochenmenge=("anzahl", "mean"),
+            median_wochenmenge=("anzahl", "median"),
+        )
+        .reset_index()
+    )
+    return base
+
+def fmt_thousands(x, pos):
+    return f"{int(x):,}".replace(",", ".")
+
+def plot_line_with_roll(df, title, y="anzahl", group_col=None, roll_col="roll_mean_13"):
+    plt.figure(figsize=(14, 6))
+    if group_col is None:
+        plt.plot(df["kw_datum"], df[y], label=y)
+        if roll_col in df.columns:
+            plt.plot(df["kw_datum"], df[roll_col], linewidth=2.5, label=roll_col)
+    else:
+        for g, sub in df.groupby(group_col):
+            plt.plot(sub["kw_datum"], sub[y], label=str(g), alpha=0.6)
+            if roll_col in sub.columns:
+                plt.plot(sub["kw_datum"], sub[roll_col], linewidth=2.2, label=f"{g} – Trend")
+    plt.title(title)
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(fmt_thousands))
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+def build_forecast(series: pd.Series, seasonal_periods=52, horizon=12):
+    series = series.asfreq("W-MON")
+    model = ExponentialSmoothing(
+        series,
+        trend="add",
+        seasonal="add",
+        seasonal_periods=seasonal_periods,
+        initialization_method="estimated"
+    )
+    fit = model.fit(optimized=True)
+    fc = fit.forecast(horizon)
+    return fit, fc
+## 4) Management-KPIs
+
+Zuerst ein kurzer Überblick über Umfang und Struktur der Daten.
+kpis = kpi_table(df_long)
+kpis
+### Interpretation
+
+Für ein Vorstands- oder Management-Reporting eignet sich an dieser Stelle meist ein komprimierter Überblick über:
+
+- Anzahl aktiver Vermittler
+- Gesamtabsatz je Segment
+- mittlere Wochenmengen
+- Produktbreite
+
+In realen Daten könnte man diese Übersicht um **Anteil aktiver Vermittler**, **Wachstum ggü. Vorperiode** und **Anteil Top-10-Vermittler** ergänzen.
+## 5) Gesamtentwicklung über die Zeit
+
+Nun aggregieren wir die Daten auf Wochenebene.  
+Das ist die zentrale Sicht für die Frage:
+
+**Wie entwickelt sich der Vertrieb insgesamt in Sach und Leben über die Zeit?**
+weekly_total = (
+    df_long.groupby(["kw_datum", "segment"], as_index=False)["anzahl"]
+    .sum()
+)
+weekly_total = add_time_features(weekly_total, value_col="anzahl", group_cols=["segment"])
+
+weekly_total.head()
+plot_line_with_roll(
+    weekly_total,
+    title="Gesamtabsatz je Woche – Sach vs. Leben (inkl. 13-Wochen-Trend)",
+    y="anzahl",
+    group_col="segment",
+    roll_col="roll_mean_13"
+)
+### Vorstandstaugliche Kernaussage
+
+Diese Darstellung ist besonders geeignet, um drei Fragen zu beantworten:
+
+1. Gibt es einen **übergeordneten Wachstumspfad**?
+2. Ist die Entwicklung **ruhig** oder **volatil**?
+3. Laufen Sach und Leben **parallel** oder zeigen sie unterschiedliche Dynamiken?
+## 6) Produktsicht: Welche Sparten treiben die Entwicklung?
+
+Hier wird je Segment die Produktentwicklung separat betrachtet.
+weekly_product = aggregate_weekly(df_long, by=("segment", "produkt"))
+weekly_product = add_time_features(weekly_product, value_col="anzahl", group_cols=["segment", "produkt"])
+
+weekly_product.head()
+for seg in ["Sach", "Leben"]:
+    sub = weekly_product[weekly_product["segment"] == seg]
+    plt.figure(figsize=(15, 7))
+    for prod, sdf in sub.groupby("produkt"):
+        plt.plot(sdf["kw_datum"], sdf["roll_mean_13"], linewidth=2.2, label=prod)
+    plt.title(f"{seg}: Produkttrends (13-Wochen-Durchschnitt)")
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(fmt_thousands))
+    plt.legend(ncol=2)
+    plt.tight_layout()
+    plt.show()
+for seg in ["Sach", "Leben"]:
+    sub = (
+        weekly_product[weekly_product["segment"] == seg]
+        .pivot(index="kw_datum", columns="produkt", values="anzahl")
+        .fillna(0)
+    )
+    sub.plot.area(figsize=(15, 6))
+    plt.title(f"{seg}: Absatzmix im Zeitverlauf (gestapelte Fläche)")
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(fmt_thousands))
+    plt.tight_layout()
+    plt.show()
+## 7) Deltas bleiben wichtig – jetzt jedoch als laufende Zeitreihe
+
+Dein bisheriger Delta-Gedanke wird nun verallgemeinert:
+
+- **1-Wochen-Delta**: Veränderung zur Vorwoche
+- optional auch 4-Wochen- oder 13-Wochen-Deltas
+- nutzbar für Monitoring, Alerting und Ursachenanalyse
+weekly_total["delta_4w"] = (
+    weekly_total.groupby("segment")["anzahl"].diff(4)
+)
+weekly_total["delta_13w"] = (
+    weekly_total.groupby("segment")["anzahl"].diff(13)
+)
+
+weekly_total.tail()
+fig, axes = plt.subplots(2, 1, figsize=(15, 9), sharex=True)
+
+for ax, seg in zip(axes, ["Sach", "Leben"]):
+    sub = weekly_total[weekly_total["segment"] == seg]
+    ax.bar(sub["kw_datum"], sub["delta_1w"])
+    ax.set_title(f"{seg}: Wochen-Delta (gegen Vorwoche)")
+    ax.set_ylabel("Delta Stückzahl")
+    ax.axhline(0, linewidth=1)
+
+plt.tight_layout()
+plt.show()
+### Nutzen dieser Sicht
+
+Die Delta-Sicht ist besonders hilfreich für:
+
+- Erkennung plötzlicher Brüche
+- Vertriebssteuerung auf kurzfristige Signale
+- Ergänzung der glatteren Trenddarstellungen
+## 8) Rolling Mean & Volatilität
+
+Ein Vorstand möchte meist nicht nur wissen, **wo** der Absatz steht, sondern auch, **wie stabil** die Entwicklung ist.
+
+Deshalb betrachten wir:
+
+- **Rolling Mean** als Trendindikator
+- **Rolling Std** als Volatilitätsmaß
+fig, axes = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+
+for ax, seg in zip(axes, ["Sach", "Leben"]):
+    sub = weekly_total[weekly_total["segment"] == seg]
+    ax.plot(sub["kw_datum"], sub["roll_std_13"], linewidth=2.2)
+    ax.set_title(f"{seg}: 13-Wochen-Volatilität")
+    ax.set_ylabel("Std-Abweichung")
+
+plt.tight_layout()
+plt.show()
+vola_product = (
+    weekly_product.groupby(["segment", "produkt"], as_index=False)["delta_1w"]
+    .std()
+    .rename(columns={"delta_1w": "volatilitaet_delta"})
+    .sort_values(["segment", "volatilitaet_delta"], ascending=[True, False])
+)
+
+vola_product
+## 9) Saisonale Muster
+
+Bei Wochenstatistiken ist die Frage zentral, ob bestimmte Kalenderwochen strukturell stärker oder schwächer sind.
+
+Dafür aggregieren wir über die **Kalenderwoche**.
+seasonality = (
+    df_long.groupby(["segment", "kw"], as_index=False)["anzahl"]
+    .mean()
+    .rename(columns={"anzahl": "durchschnitt_absatz"})
+)
+
+plt.figure(figsize=(15, 6))
+for seg, sub in seasonality.groupby("segment"):
+    plt.plot(sub["kw"], sub["durchschnitt_absatz"], linewidth=2.2, label=seg)
+plt.title("Saisonprofil nach Kalenderwoche – durchschnittlicher Absatz")
+plt.xlabel("Kalenderwoche")
+plt.ylabel("Ø Stückzahl")
+plt.legend()
+plt.tight_layout()
+plt.show()
+## 10) STL-Zerlegung einer Gesamtzeitreihe
+
+Für das Management ist es oft überzeugend, die Gesamtzeitreihe in drei Bestandteile zu zerlegen:
+
+- **Trend**
+- **Saison**
+- **Rest / Irregularität**
+
+Das ist kein Prognosemodell, sondern ein **Erklär- und Strukturierungswerkzeug**.
+for seg in ["Sach", "Leben"]:
+    ts = (
+        weekly_total[weekly_total["segment"] == seg]
+        .set_index("kw_datum")["anzahl"]
+        .asfreq("W-MON")
+    )
+    stl = STL(ts, period=52, robust=True)
+    res = stl.fit()
+    fig = res.plot()
+    fig.set_size_inches(14, 8)
+    fig.suptitle(f"STL-Zerlegung – {seg}", y=1.02)
+    plt.tight_layout()
+    plt.show()
+## 11) Alerting / Auffälligkeiten
+
+Nun markieren wir Wochen, in denen die Abweichung von der jüngeren Historie ungewöhnlich hoch ist.
+Ein einfaches und gut kommunizierbares Verfahren ist ein Rolling-Z-Score.
+alerts = weekly_total.copy()
+alerts["zscore_13"] = (
+    (alerts["anzahl"] - alerts["roll_mean_13"]) / alerts["roll_std_13"]
+)
+alerts["alert_flag"] = alerts["zscore_13"].abs() >= 2.0
+
+alerts[alerts["alert_flag"]].head(10)
+for seg in ["Sach", "Leben"]:
+    sub = alerts[alerts["segment"] == seg]
+    flagged = sub[sub["alert_flag"]]
+
+    plt.figure(figsize=(15, 6))
+    plt.plot(sub["kw_datum"], sub["anzahl"], label="Ist")
+    plt.plot(sub["kw_datum"], sub["roll_mean_13"], linewidth=2.4, label="Trend (13W)")
+    plt.scatter(flagged["kw_datum"], flagged["anzahl"], s=80, label="Auffällig")
+    plt.title(f"{seg}: Auffällige Wochen (|Z| ≥ 2)")
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+## 12) Vermittlerperspektive: Top-Mover über die Zeit
+
+Neben der Gesamtsteuerung ist die Vermittlerperspektive operativ besonders wertvoll.  
+Hier werden Vermittler mit den größten kumulierten Bewegungen betrachtet.
+broker_weekly = (
+    df_long.groupby(["kw_datum", "segment", "vermittler"], as_index=False)["anzahl"]
+    .sum()
+    .sort_values(["segment", "vermittler", "kw_datum"])
+)
+
+broker_weekly["delta_1w"] = broker_weekly.groupby(["segment", "vermittler"])["anzahl"].diff()
+broker_weekly["abs_delta_1w"] = broker_weekly["delta_1w"].abs()
+
+top_movers = (
+    broker_weekly.groupby(["segment", "vermittler"], as_index=False)["abs_delta_1w"]
+    .sum()
+    .sort_values(["segment", "abs_delta_1w"], ascending=[True, False])
+)
+
+top_movers.groupby("segment").head(10)
+for seg in ["Sach", "Leben"]:
+    top_ids = (
+        top_movers[top_movers["segment"] == seg]
+        .head(6)["vermittler"]
+        .tolist()
+    )
+    sub = broker_weekly[
+        (broker_weekly["segment"] == seg) &
+        (broker_weekly["vermittler"].isin(top_ids))
+    ].copy()
+    sub["roll_mean_13"] = sub.groupby("vermittler")["anzahl"].transform(lambda s: s.rolling(13, min_periods=1).mean())
+
+    plt.figure(figsize=(15, 7))
+    for v, sdf in sub.groupby("vermittler"):
+        plt.plot(sdf["kw_datum"], sdf["roll_mean_13"], linewidth=2.0, label=v)
+    plt.title(f"{seg}: Top-Mover Vermittler – geglättete Zeitreihen")
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.legend(ncol=2)
+    plt.tight_layout()
+    plt.show()
+## 13) Heatmap: Vermittler x Woche
+
+Für eine kompakte Mustererkennung kann eine Heatmap sehr stark sein.  
+Statt Vermittler x Produkt (wie im Delta-Demo) betrachten wir hier:
+
+**Vermittler x Woche** mit der Wochenleistung.
+for seg in ["Sach", "Leben"]:
+    top_ids = (
+        broker_weekly[broker_weekly["segment"] == seg]
+        .groupby("vermittler")["anzahl"].sum()
+        .sort_values(ascending=False)
+        .head(20)
+        .index
+    )
+
+    piv = (
+        broker_weekly[
+            (broker_weekly["segment"] == seg) &
+            (broker_weekly["vermittler"].isin(top_ids))
+        ]
+        .pivot(index="vermittler", columns="kw_datum", values="anzahl")
+        .fillna(0)
+    )
+
+    plt.figure(figsize=(16, 8))
+    sns.heatmap(piv, cmap="RdBu_r", center=piv.values.mean())
+    plt.title(f"{seg}: Heatmap Top-20 Vermittler x Woche")
+    plt.xlabel("Woche")
+    plt.ylabel("Vermittler")
+    plt.tight_layout()
+    plt.show()
+## 14) Konzentration: Wie stark tragen Top-Vermittler?
+
+Managementrelevant ist oft nicht nur der Gesamtabsatz, sondern auch die Frage nach der Abhängigkeit von wenigen großen Produzenten.
+broker_share = (
+    df_long.groupby(["segment", "vermittler"], as_index=False)["anzahl"]
+    .sum()
+)
+
+def concentration_table(df):
+    out = []
+    for seg, sub in df.groupby("segment"):
+        sub = sub.sort_values("anzahl", ascending=False).reset_index(drop=True)
+        total = sub["anzahl"].sum()
+        for n in [5, 10, 20]:
+            share = sub.head(n)["anzahl"].sum() / total if total else np.nan
+            out.append({"segment": seg, "top_n": n, "anteil_absatz": share})
+    return pd.DataFrame(out)
+
+concentration = concentration_table(broker_share)
+concentration
+plt.figure(figsize=(10, 5))
+sns.barplot(data=concentration, x="top_n", y="anteil_absatz", hue="segment")
+plt.title("Absatzanteil der Top-Vermittler")
+plt.xlabel("Top-N Vermittler")
+plt.ylabel("Anteil am Gesamtabsatz")
+plt.tight_layout()
+plt.show()
+## 15) Zusammenhang Sach vs. Leben
+
+Für die Gesamtsteuerung ist interessant, ob beide Segmente ähnlich laufen oder unterschiedliche Taktungen haben.
+wide_total = (
+    weekly_total.pivot(index="kw_datum", columns="segment", values="anzahl")
+    .dropna()
+)
+
+corr = wide_total.corr()
+corr
+plt.figure(figsize=(7, 6))
+sns.heatmap(corr, annot=True, cmap="RdBu_r", center=0)
+plt.title("Korrelation der Segment-Gesamtzeitreihen")
+plt.tight_layout()
+plt.show()
+## 16) Forecasting für Management-Orientierung
+
+Für einen ersten, vorstandstauglichen Forecast genügt oft ein **transparentes Basismodell**.
+Hier verwenden wir Holt-Winters / Exponential Smoothing.
+
+Wichtig:
+- Forecasts sind **keine Wahrheit**, sondern eine plausible Fortschreibung des Musters.
+- Im Realbetrieb sollten Forecasts gegen externe Effekte, Kampagnen und Vertriebsmaßnahmen gespiegelt werden.
+forecast_results = {}
+
+for seg in ["Sach", "Leben"]:
+    ts = (
+        weekly_total[weekly_total["segment"] == seg]
+        .set_index("kw_datum")["anzahl"]
+        .asfreq("W-MON")
+    )
+    fit, fc = build_forecast(ts, seasonal_periods=52, horizon=12)
+    forecast_results[seg] = {"fit": fit, "forecast": fc}
+
+    plt.figure(figsize=(15, 6))
+    plt.plot(ts.index, ts.values, label="Historie")
+    plt.plot(fc.index, fc.values, label="Forecast", linewidth=2.5)
+    plt.title(f"{seg}: 12-Wochen-Forecast (Holt-Winters)")
+    plt.xlabel("Woche")
+    plt.ylabel("Stückzahl")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+## 17) Executive Summary – automatisch generiert
+
+Für ein späteres Management-Reporting ist es hilfreich, am Ende des Notebooks einen kleinen Textblock automatisch zu erzeugen.
+def build_exec_summary(weekly_total: pd.DataFrame, concentration: pd.DataFrame) -> str:
+    out = []
+    for seg in ["Sach", "Leben"]:
+        sub = weekly_total[weekly_total["segment"] == seg].sort_values("kw_datum")
+        latest = sub.iloc[-1]
+        first = sub.iloc[0]
+        growth_abs = latest["anzahl"] - first["anzahl"]
+        growth_pct = growth_abs / first["anzahl"] if first["anzahl"] else np.nan
+        avg_vola = sub["roll_std_13"].mean()
+        top10 = concentration[(concentration["segment"] == seg) & (concentration["top_n"] == 10)]["anteil_absatz"].iloc[0]
+
+        out.append(
+            f"{seg}: Seit Beginn der Beobachtung veränderte sich der Wochenabsatz um "
+            f"{growth_abs:,.0f} Stück ({growth_pct:.1%}). "
+            f"Die mittlere 13-Wochen-Volatilität liegt bei {avg_vola:,.1f}. "
+            f"Die Top-10-Vermittler stehen kumuliert für {top10:.1%} des Absatzes."
+        )
+    return "\n".join(out)
+
+summary_text = build_exec_summary(weekly_total, concentration)
+print(summary_text)
+## 18) Überleitung auf reale Dateien
+
+In Deinem Realszenario kommen vermutlich pro Woche Excel-Dateien herein.  
+Ein praktikabler Zielprozess wäre:
+
+1. **Dateien einlesen** (eine Datei pro Woche oder getrennt nach Sach / Leben)
+2. auf ein gemeinsames Schema normalisieren
+3. zu einem historischen Wochenbestand zusammenführen
+4. aus diesem Bestand die hier gezeigten Analysen erzeugen
+
+Die Produktivfunktion könnte etwa so aussehen:
+
+- `load_weekly_files(...)`
+- `normalize_columns(...)`
+- `build_history(...)`
+- `run_management_timeseries_report(...)`
+# Blaupause für reale Datenanbindung (Pseudo-Produktivcode)
+
+from pathlib import Path
+
+def normalize_week_file(df: pd.DataFrame, segment: str, date_col_value) -> pd.DataFrame:
+    df = df.copy()
+    df["kw_datum"] = pd.to_datetime(date_col_value)
+    df["segment"] = segment
+
+    # Beispielhafte Annahme:
+    # erste Spalte = Vermittlernummer
+    # übrige relevante Produktspalten = SV_* oder LV_*
+    id_col = "vermittler"
+    if id_col not in df.columns:
+        # anpassen, falls die Spalte anders heißt
+        raise ValueError("Spalte 'vermittler' nicht gefunden.")
+
+    product_cols = [c for c in df.columns if c.startswith("SV_") or c.startswith("LV_")]
+    out = df.melt(
+        id_vars=["kw_datum", "segment", id_col],
+        value_vars=product_cols,
+        var_name="produkt",
+        value_name="anzahl"
+    ).rename(columns={id_col: "vermittler"})
+
+    out["anzahl"] = pd.to_numeric(out["anzahl"], errors="coerce").fillna(0)
+    out["jahr"] = out["kw_datum"].dt.isocalendar().year.astype(int)
+    out["kw"] = out["kw_datum"].dt.isocalendar().week.astype(int)
+    return out
+
+# Beispiel:
+# files = sorted(Path("daten/wochenfiles").glob("*.xlsx"))
+# all_parts = []
+# for f in files:
+#     raw = pd.read_excel(f)
+#     part = normalize_week_file(raw, segment="Sach", date_col_value="2026-01-05")
+#     all_parts.append(part)
+# df_history = pd.concat(all_parts, ignore_index=True)
+## 19) Empfehlungen für Dein reales Vorstandsreporting
+
+Für eine **vorstandstaugliche Version** würde ich im Kern diese Seiten / Kapitel im Notebook bzw. im späteren PDF-Export verwenden:
+
+### Pflichtteil
+1. Executive Summary
+2. Gesamttrend Sach vs. Leben
+3. Produkttrends je Segment
+4. Deltas & Alerts
+5. Top-Vermittler / Konzentration
+6. 12-Wochen-Forecast
+
+### Operativer Vertiefungsteil
+7. Heatmap Vermittler x Woche
+8. Volatilität nach Produkt
+9. Saisonprofil nach Kalenderwochen
+10. Detailansichten einzelner Vermittler
+
+### Optionaler Ausbau
+- Ziel-/Ist-Abgleich
+- Kampagnenmarker
+- Feiertags- / Saisoneffekte
+- ABC-Klassifizierung von Vermittlern
+- robuste Forecast-Vergleiche mehrerer Modelle
+- Ampellogik für Steuerungsmaßnahmen
+## 20) Fazit
+
+Der wesentliche methodische Fortschritt gegenüber einer reinen Delta-Betrachtung zwischen zwei Wochen ist:
+
+- Übergang von **punktueller Veränderungsmessung** zu **historischer Dynamikanalyse**
+- Trennung von **Trend, Schwankung und Saison**
+- bessere Grundlage für **Steuerung, Priorisierung und Prognose**
+
+Damit wird aus einem reaktiven Wochenvergleich ein **echtes Vertriebsmonitoring über die Zeit**.
