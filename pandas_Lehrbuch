@@ -1,0 +1,120 @@
+# Pandas – Selektions‑, Filter‑ und Analyse‑Techniken  
+### Ein persönliches Nachschlagewerk für DataFrame‑Selektion, Gruppierung, CV‑Analyse und Typologie  
+Autor: Stefan
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+## 2) Selektions‑Basics: Kategorien mit geringer Häufigkeit filtern
+
+vc = df['Spalte_x'].value_counts()
+rare = vc[vc < n].index
+df_filtered = df[df['Spalte_x'].isin(rare)]
+df_filtered
+### 2a. value_counts() + isin()
+vc = df['Spalte_x'].value_counts()
+rare = vc[vc < n].index
+df_filtered = df[df['Spalte_x'].isin(rare)]
+df_filtered
+
+### 2b. transform("count") – die eleganteste Lösung
+df_filtered = df[df['Spalte_x'].transform('count') < n]
+df_filtered
+
+### 2c. groupby().filter() (Code)
+df_filtered = df.groupby('Spalte_x').filter(lambda g: len(g) < n)
+df_filtered
+
+## 3) Generische Selektionsfunktion (Highlight!)
+Diese Funktion nimmt jede beliebige Bedingung entgegen und gibt dir einen DataFrame zurück.
+def filter_df(df, condition):
+    """
+    condition: Funktion, die eine Zeile (Series) erhält und True/False zurückgibt.
+    Beispiel: lambda row: row.eq(0).sum() < 0.95 * len(row)
+    """
+    mask = df.apply(condition, axis=1)
+    return df[mask]
+
+## 4) Aggregation von Produktkategorien nach Dictionary
+### 4.a) Kategorien aus SPRTDICT summieren
+summary = pd.DataFrame(index=df.index)
+
+for bereich, kat_dict in SPRTDICT.items():
+    for kategorie, spaltenliste in kat_dict.items():
+        vorhandene = [sp for sp in spaltenliste if sp in df.columns]
+        summary[kategorie] = df[vorhandene].sum(axis=1)
+
+## 5) CV‑Analyse und Vermittler‑Typologie
+### 5.a) CV berechnen
+kategorien = list(SPRTDICT['sach'].keys()) + list(SPRTDICT['leben'].keys())
+
+def cv(row):
+    werte = row[kategorien].values
+    werte = werte[werte > 0]
+    if len(werte) <= 1:
+        return 0
+    return np.std(werte) / np.mean(werte)
+
+summary['cv'] = summary.apply(cv, axis=1)
+
+### 5.b) Leben/Sach-Indikatoren
+summary['has_leben'] = df['VermittlernummerLeben'].notna()
+summary['has_sach']  = df['VermittlernummerSach'].notna()
+
+### 5.c) Optimalen CV‑Cutoff bestimmen (KMeans)
+from sklearn.cluster import KMeans
+
+km = KMeans(n_clusters=2, random_state=42).fit(summary[['cv']])
+centers = sorted(km.cluster_centers_.flatten())
+cv_cutoff = (centers[0] + centers[1]) / 2
+cv_cutoff
+
+### 5.d) Typologie bestimmen
+def typologie(row):
+    if row['has_leben'] and not row['has_sach']:
+        return 'leben-fokus'
+    if row['has_sach'] and not row['has_leben']:
+        return 'sach-fokus'
+    if row['has_leben'] and row['has_sach']:
+        return 'breit-aktiv' if row['cv'] < cv_cutoff else 'volatil'
+    return 'inaktiv'
+
+summary['typ'] = summary.apply(typologie, axis=1)
+summary[['cv', 'typ']]
+
+## 6) Heatmap der Produktverteilung
+plt.figure(figsize=(12, 6))
+sns.heatmap(summary[kategorien], cmap="viridis")
+plt.title("Produktverteilung pro Vermittler")
+plt.tight_layout()
+plt.show()
+## 7) Histogramm zur visuellen Bestimmung des CV‑Cutoffs
+plt.figure(figsize=(8,4))
+plt.hist(summary['cv'], bins=20, color='steelblue', edgecolor='black')
+plt.axvline(summary['cv'].median(), color='red', linestyle='--', label='Median')
+plt.title("Verteilung des CV")
+plt.xlabel("CV")
+plt.ylabel("Häufigkeit")
+plt.legend()
+plt.show()
+## 8) Bonus: Nützliche Helfer & Tricks:
+### Null‑Anteile pro Zeile
+df.isna().mean(axis=1)
+
+### Anzahl nicht‑Null pro Zeile
+df.notna().sum(axis=1)
+
+### Zeilen mit mindestens einem True
+df[df.any(axis=1)]
+
+### Zeilen mit allen True
+df[df.all(axis=1)]
+
+### Spalten dynamisch auswählen
+df.filter(regex="^NEU")
+
+### Spalten umbenennen
+df.rename(columns=str.lower)
+
+### Multi‑Filter
+df[(df.A > 0) & (df.B == "X")]
