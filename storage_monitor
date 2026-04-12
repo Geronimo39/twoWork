@@ -1,0 +1,550 @@
+"""
+storage_monitor.py
+==================
+AS/400 Speicherplatz-Monitor und Trendanalyse
+
+Zwei Modi:
+  1) LIVE   -- Aktuellen Disk-Füllstand vom System abfragen und in SQLite speichern
+  2) EXCEL  -- Historische Zeilenzahlen aus bestehenden Excel-Snapshots einlesen
+               und daraus eine Wachstumsprognose ableiten
+
+Voraussetzungen:
+  pip install pyodbc pandas openpyxl numpy scipy
+
+Konfiguration: Abschnitt CONFIG weiter unten anpassen.
+"""
+
+import pyodbc
+import pandas as pd
+import numpy as np
+import sqlite3
+import os
+import glob
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
+
+try:
+    from scipy import stats
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+
+# ===========================================================================
+# CONFIG -- hier anpassen
+# ===========================================================================
+
+# ODBC-Verbindungsstring (wie in deinen anderen Skripten)
+ODBC_DSN = "AS400"          # oder vollständiger Connection-String
+
+# SQLite-Datenbank (bereits vorhanden aus Phase 2)
+SQLITE_PATH = r"C:\Users\stefan\as400_analysis.sqlite"  # Pfad anpassen
+
+# Verzeichnis, in dem deine wöchentlichen Excel-Snapshots liegen
+EXCEL_DIR = r"C:\Users\stefan\vrdat_snapshots"          # Pfad anpassen
+
+# Namensmuster der Excel-Dateien (anpassen falls nötig)
+# Beispiel: vrdat_2024_06_03.xlsx, vrdat_2024_06_10.xlsx, ...
+EXCEL_PATTERN = "*.xlsx"
+
+# Spaltenname in den Excel-Dateien, der die Zeilenzahl enthält
+# (aus deinem Phase-1-Skript -- vermutlich "Zeilen" oder "NUMBER_ROWS")
+COL_ZEILEN = "Zeilen"           # anpassen falls abweichend
+COL_TABELLE = "Tabelle"         # Tabellenname-Spalte
+
+# Warnschwelle in Prozent (für Live-Modus)
+WARN_PCT = 80.0
+
+# ===========================================================================
+# DATENBANK-SETUP
+# ===========================================================================
+
+def setup_sqlite(conn_sqlite):
+    conn_sqlite.executescript("""
+        CREATE TABLE IF NOT EXISTS storage_history (
+            ts          TEXT NOT NULL,
+            source      TEXT NOT NULL,    -- 'live' oder 'excel'
+            total_mb    REAL,
+            used_mb     REAL,
+            pct_used    REAL,
+            notes       TEXT,
+            PRIMARY KEY (ts, source)
+        );
+
+        CREATE TABLE IF NOT EXISTS vrdat_row_history (
+            ts          TEXT NOT NULL,
+            table_name  TEXT NOT NULL,
+            row_count   BIGINT NOT NULL,
+            PRIMARY KEY (ts, table_name)
+        );
+    """)
+    conn_sqlite.commit()
+    print("[DB] SQLite-Tabellen bereit.")
+
+
+# ===========================================================================
+# MODUS 1: LIVE -- Aktuellen Disk-Füllstand abfragen
+# ===========================================================================
+
+def fetch_live_storage(conn_as400):
+    """
+    Versucht nacheinander mehrere QSYS2-Views, die auf pre-v7 verfügbar sind.
+    Gibt DataFrame mit total_mb, used_mb, pct_used zurück oder None.
+    """
+    queries = [
+        # v7.1+
+        ("QSYS2.ASP_INFO",
+         """SELECT SUM(TOTAL_CAPACITY) AS total_mb,
+                   SUM(USED_CAPACITY)  AS used_mb,
+                   ROUND(SUM(USED_CAPACITY) * 100.0 / SUM(TOTAL_CAPACITY), 2) AS pct_used
+            FROM QSYS2.ASP_INFO"""),
+        # Alternativ: SYSTEM_STATUS_INFO (einige pre-v7-Builds)
+        ("QSYS2.SYSTEM_STATUS_INFO",
+         """SELECT TOTAL_AUXILIARY_STORAGE    AS total_mb,
+                   AUXILIARY_STORAGE_IN_USE   AS used_mb,
+                   ROUND(AUXILIARY_STORAGE_IN_USE * 100.0
+                         / TOTAL_AUXILIARY_STORAGE, 2)  AS pct_used
+            FROM QSYS2.SYSTEM_STATUS_INFO FETCH FIRST 1 ROW ONLY"""),
+    ]
+
+    for view_name, sql in queries:
+        try:
+            df = pd.read_sql(sql, conn_as400)
+            if not df.empty and df["total_mb"].iloc[0]:
+                print(f"[LIVE] Daten aus {view_name} gelesen.")
+                return df
+        except Exception as e:
+            print(f"[LIVE] {view_name} nicht verfügbar: {e}")
+
+    # Letzter Fallback: QCMDEXC + WRKSYSSTS in Outfile
+    print("[LIVE] Versuche WRKSYSSTS-Fallback via QCMDEXC ...")
+    try:
+        conn_as400.execute(
+            "CALL QSYS2.QCMDEXC('WRKSYSSTS OUTPUT(*OUTFILE) "
+            "OUTFILE(QTEMP/SYSSTS_TMP) OUTMBR(*FIRST *REPLACE)')"
+        )
+        df = pd.read_sql(
+            "SELECT WSDSKA AS total_mb, WSDSKU AS used_mb, "
+            "ROUND(WSDSKU * 100.0 / WSDSKA, 2) AS pct_used "
+            "FROM QTEMP.SYSSTS_TMP FETCH FIRST 1 ROW ONLY",
+            conn_as400
+        )
+        if not df.empty:
+            print("[LIVE] WRKSYSSTS-Fallback erfolgreich.")
+            return df
+    except Exception as e:
+        print(f"[LIVE] WRKSYSSTS-Fallback fehlgeschlagen: {e}")
+
+    return None
+
+
+def run_live_mode(conn_as400, conn_sqlite):
+    print("\n" + "="*60)
+    print("MODUS 1: Live-Abfrage Disk-Füllstand")
+    print("="*60)
+
+    df = fetch_live_storage(conn_as400)
+    if df is None:
+        print("[LIVE] Konnte keinen Disk-Status ermitteln.")
+        print("       Bitte Admin-Team nach QSYS2.ASP_INFO-Zugriff fragen.")
+        return
+
+    row = df.iloc[0]
+    total  = float(row["total_mb"])
+    used   = float(row["used_mb"])
+    pct    = float(row["pct_used"])
+    free   = total - used
+
+    print(f"\n  Gesamt:     {total:>12,.0f} MB  ({total/1024:,.1f} GB)")
+    print(f"  Belegt:     {used:>12,.0f} MB  ({used/1024:,.1f} GB)")
+    print(f"  Frei:       {free:>12,.0f} MB  ({free/1024:,.1f} GB)")
+    print(f"  Auslastung: {pct:>11.1f} %")
+
+    if pct >= WARN_PCT:
+        print(f"\n  *** WARNUNG: Auslastung über {WARN_PCT}% ***")
+
+    # In SQLite speichern
+    ts = datetime.now().isoformat(timespec="seconds")
+    conn_sqlite.execute(
+        "INSERT OR REPLACE INTO storage_history "
+        "(ts, source, total_mb, used_mb, pct_used, notes) VALUES (?,?,?,?,?,?)",
+        (ts, "live", total, used, pct, None)
+    )
+    conn_sqlite.commit()
+    print(f"\n[DB] Messung gespeichert: {ts}")
+
+    # Trend aus bisherigen Live-Messungen
+    df_hist = pd.read_sql(
+        "SELECT ts, used_mb, total_mb FROM storage_history "
+        "WHERE source='live' ORDER BY ts",
+        conn_sqlite
+    )
+    if len(df_hist) >= 3:
+        print_trend_from_storage_history(df_hist)
+    else:
+        print(f"\n[TREND] Noch {len(df_hist)} Live-Messung(en) -- "
+              "mind. 3 nötig für Trendlinie.\n"
+              "        Skript regelmäßig ausführen (1x/Woche genügt).")
+
+
+# ===========================================================================
+# MODUS 2: EXCEL -- Historische Snapshots aus VRDAT einlesen
+# ===========================================================================
+
+def parse_date_from_filename(fname):
+    """
+    Versucht ein Datum aus dem Dateinamen zu extrahieren.
+    Unterstützte Muster: YYYY_MM_DD, YYYY-MM-DD, YYYYMMDD, DD.MM.YYYY
+    """
+    import re
+    stem = Path(fname).stem
+    patterns = [
+        (r"(\d{4})[_\-](\d{2})[_\-](\d{2})", "%Y%m%d"),
+        (r"(\d{2})\.(\d{2})\.(\d{4})",         None),   # DD.MM.YYYY
+        (r"(\d{8})",                             "%Y%m%d"),
+    ]
+    for pat, fmt in patterns:
+        m = re.search(pat, stem)
+        if m:
+            try:
+                if fmt:
+                    digits = "".join(m.groups())
+                    return datetime.strptime(digits, fmt)
+                else:
+                    # DD.MM.YYYY
+                    d, mo, y = m.groups()
+                    return datetime(int(y), int(mo), int(d))
+            except ValueError:
+                continue
+    return None
+
+
+def load_excel_snapshots(excel_dir, pattern, col_zeilen, col_tabelle):
+    """
+    Liest alle Excel-Snapshots ein und gibt einen DataFrame mit
+    (ts, table_name, row_count) zurück.
+    """
+    files = sorted(glob.glob(os.path.join(excel_dir, pattern)))
+    if not files:
+        print(f"[EXCEL] Keine Dateien gefunden in: {excel_dir}")
+        return pd.DataFrame()
+
+    records = []
+    skipped = []
+
+    for fpath in files:
+        fname = os.path.basename(fpath)
+        dt = parse_date_from_filename(fname)
+        if dt is None:
+            # Fallback: Datei-Änderungsdatum
+            dt = datetime.fromtimestamp(os.path.getmtime(fpath))
+            print(f"[EXCEL] Kein Datum im Namen '{fname}' -- "
+                  f"nutze Dateidatum: {dt.date()}")
+
+        try:
+            # Erstes Sheet lesen; bei mehrseitigem Excel ggf. sheet_name anpassen
+            df = pd.read_excel(fpath, sheet_name=0, engine="openpyxl")
+
+            # Spaltennamen normalisieren (Leerzeichen, Groß/Kleinschreibung)
+            df.columns = df.columns.str.strip()
+
+            # Spalten suchen (flexibel)
+            col_z = next(
+                (c for c in df.columns
+                 if c.upper() == col_zeilen.upper()), None
+            )
+            col_t = next(
+                (c for c in df.columns
+                 if c.upper() == col_tabelle.upper()), None
+            )
+
+            if col_z is None:
+                skipped.append((fname, f"Spalte '{col_zeilen}' nicht gefunden. "
+                                       f"Vorhandene Spalten: {list(df.columns)}"))
+                continue
+            if col_t is None:
+                skipped.append((fname, f"Spalte '{col_tabelle}' nicht gefunden."))
+                continue
+
+            df_sub = df[[col_t, col_z]].dropna()
+            df_sub.columns = ["table_name", "row_count"]
+            df_sub["ts"] = dt.date().isoformat()
+            df_sub["row_count"] = pd.to_numeric(
+                df_sub["row_count"], errors="coerce"
+            ).fillna(0).astype(int)
+
+            records.append(df_sub)
+
+        except Exception as e:
+            skipped.append((fname, str(e)))
+
+    if skipped:
+        print("\n[EXCEL] Folgende Dateien konnten nicht gelesen werden:")
+        for fname, reason in skipped:
+            print(f"  {fname}: {reason}")
+
+    if not records:
+        return pd.DataFrame()
+
+    df_all = pd.concat(records, ignore_index=True)
+    print(f"\n[EXCEL] {len(files)} Dateien gelesen, "
+          f"{len(df_all)} Datenpunkte über "
+          f"{df_all['ts'].nunique()} Wochen.")
+    return df_all
+
+
+def run_excel_mode(conn_sqlite):
+    print("\n" + "="*60)
+    print("MODUS 2: Excel-Snapshots VRDAT einlesen & Trend ableiten")
+    print("="*60)
+
+    df_all = load_excel_snapshots(
+        EXCEL_DIR, EXCEL_PATTERN, COL_ZEILEN, COL_TABELLE
+    )
+    if df_all.empty:
+        print("[EXCEL] Keine Daten geladen. Bitte CONFIG prüfen.")
+        return
+
+    # In SQLite speichern
+    df_all.to_sql(
+        "vrdat_row_history", conn_sqlite,
+        if_exists="replace", index=False
+    )
+    conn_sqlite.commit()
+    print(f"[DB]    vrdat_row_history befüllt mit {len(df_all)} Zeilen.")
+
+    # Gesamtzeilen pro Snapshot-Datum
+    df_total = (
+        df_all.groupby("ts")["row_count"]
+        .sum()
+        .reset_index()
+        .rename(columns={"row_count": "total_rows"})
+        .sort_values("ts")
+    )
+
+    print("\n--- Gesamtzeilen VRDAT pro Snapshot ---")
+    print(f"  {'Datum':<12}  {'Gesamtzeilen':>15}  {'Delta':>12}")
+    prev = None
+    for _, r in df_total.iterrows():
+        delta = f"+{r.total_rows - prev:,.0f}" if prev is not None else "  --"
+        print(f"  {r.ts:<12}  {r.total_rows:>15,.0f}  {delta:>12}")
+        prev = r.total_rows
+
+    # Trendanalyse
+    print_trend_from_row_history(df_total)
+
+    # Top-5 wachstumsstärkste Tabellen
+    print_top_growing_tables(df_all)
+
+
+def print_trend_from_row_history(df_total):
+    """Lineare Regression auf Gesamtzeilen VRDAT."""
+    print("\n--- Trendanalyse (lineare Regression) ---")
+
+    df = df_total.copy()
+    df["date"] = pd.to_datetime(df["ts"])
+    df["day_num"] = (df["date"] - df["date"].min()).dt.days
+    x = df["day_num"].values
+    y = df["total_rows"].values
+
+    if len(x) < 2:
+        print("  Zu wenige Datenpunkte für Regression.")
+        return
+
+    if SCIPY_AVAILABLE:
+        slope, intercept, r, p, se = stats.linregress(x, y)
+        print(f"  R²-Wert:          {r**2:.4f}  "
+              f"({'gut' if r**2 > 0.85 else 'mäßig -- nichtlineares Wachstum möglich'})")
+    else:
+        coeffs = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+        r_sq = 1 - (np.sum((y - (slope*x + intercept))**2) /
+                    np.sum((y - y.mean())**2))
+        print(f"  R²-Wert:          {r_sq:.4f}")
+
+    rows_per_day  = slope
+    rows_per_week = slope * 7
+
+    print(f"  Wachstum/Tag:     {rows_per_day:>12,.0f} Zeilen")
+    print(f"  Wachstum/Woche:   {rows_per_week:>12,.0f} Zeilen")
+    print(f"  Wachstum/Jahr:    {rows_per_day*365:>12,.0f} Zeilen (Hochrechnung)")
+
+    # Projektion: Wann wird das Volumen verdoppelt?
+    current = y[-1]
+    if rows_per_day > 0:
+        days_to_double = current / rows_per_day
+        date_double = datetime.now() + timedelta(days=days_to_double)
+        print(f"\n  Aktuell:          {current:>12,.0f} Zeilen")
+        print(f"  Verdopplung in:   {int(days_to_double):>8} Tagen "
+              f"(ca. {date_double.strftime('%d.%m.%Y')})")
+
+    # Projektion 6 / 12 / 24 Monate
+    print("\n  Prognose künftiger Gesamtzeilen:")
+    today_day = (pd.Timestamp.now() - df["date"].min()).days
+    for months, label in [(6, "in  6 Monaten"), (12, "in 12 Monaten"),
+                          (24, "in 24 Monaten")]:
+        future_day = today_day + months * 30
+        projected = slope * future_day + intercept
+        growth_pct = (projected - current) / current * 100
+        print(f"  {label}:  {projected:>14,.0f} Zeilen  "
+              f"(+{growth_pct:.0f}% vs. heute)")
+
+
+def print_top_growing_tables(df_all):
+    """Zeigt die 5 Tabellen mit dem stärksten absoluten Zeilenwachstum."""
+    print("\n--- Top-5 Tabellen nach absolutem Wachstum ---")
+
+    df_pivot = df_all.pivot_table(
+        index="table_name", columns="ts", values="row_count", aggfunc="max"
+    )
+    cols_sorted = sorted(df_pivot.columns)
+    if len(cols_sorted) < 2:
+        print("  Zu wenige Snapshots für Vergleich.")
+        return
+
+    first_col = cols_sorted[0]
+    last_col  = cols_sorted[-1]
+    df_pivot["delta"] = df_pivot[last_col] - df_pivot[first_col]
+    df_pivot["delta_pct"] = df_pivot["delta"] / df_pivot[first_col].replace(0, np.nan) * 100
+
+    top5 = df_pivot.nlargest(5, "delta")[["delta", "delta_pct", last_col]]
+    top5.columns = ["Wachstum (Zeilen)", "Wachstum (%)", f"Stand {last_col}"]
+
+    print(f"  Zeitraum: {first_col} bis {last_col}\n")
+    print(f"  {'Tabelle':<30} {'Wachstum':>15} {'%':>8} {'Aktuell':>15}")
+    print("  " + "-"*72)
+    for tname, row in top5.iterrows():
+        pct_str = f"{row['Wachstum (%)']:.1f}%" if pd.notna(row['Wachstum (%)']) else "   n/a"
+        print(f"  {str(tname):<30} {row['Wachstum (Zeilen)']:>15,.0f} "
+              f"{pct_str:>8}  {row[f'Stand {last_col}']:>14,.0f}")
+
+
+# ===========================================================================
+# MODUS 3: TREND aus bisherigen Live-Messungen (intern genutzt)
+# ===========================================================================
+
+def print_trend_from_storage_history(df_hist):
+    print("\n--- Disk-Trend aus bisherigen Live-Messungen ---")
+
+    df = df_hist.copy()
+    df["date"] = pd.to_datetime(df["ts"])
+    df["day_num"] = (df["date"] - df["date"].min()).dt.days
+    x = df["day_num"].values
+    y = df["used_mb"].values
+    total = df["total_mb"].iloc[-1]
+
+    if SCIPY_AVAILABLE:
+        slope, intercept, r, _, _ = stats.linregress(x, y)
+        print(f"  R²-Wert: {r**2:.4f}")
+    else:
+        coeffs  = np.polyfit(x, y, 1)
+        slope, intercept = coeffs
+
+    today_day   = (pd.Timestamp.now() - df["date"].min()).days
+    current_hat = slope * today_day + intercept
+    remaining   = total - current_hat
+
+    if slope > 0:
+        days_full = remaining / slope
+        date_full = datetime.now() + timedelta(days=days_full)
+        print(f"  Wachstum/Tag:  {slope:,.1f} MB")
+        print(f"  Frei (akt.):   {remaining:,.0f} MB")
+        print(f"  Prognose voll: {date_full.strftime('%d.%m.%Y')} "
+              f"(in ~{int(days_full)} Tagen)")
+
+        for pct_warn in [80, 90, 95]:
+            threshold = total * pct_warn / 100
+            days_warn = (threshold - current_hat) / slope
+            if days_warn > 0:
+                date_warn = datetime.now() + timedelta(days=days_warn)
+                print(f"  {pct_warn}%-Schwelle:    {date_warn.strftime('%d.%m.%Y')} "
+                      f"(in ~{int(days_warn)} Tagen)")
+    else:
+        print("  Kein positives Wachstum erkennbar.")
+
+
+# ===========================================================================
+# ZUSAMMENFASSUNG
+# ===========================================================================
+
+def print_summary_report(conn_sqlite):
+    print("\n" + "="*60)
+    print("ZUSAMMENFASSUNG")
+    print("="*60)
+
+    # Letzte Live-Messung
+    df_live = pd.read_sql(
+        "SELECT ts, used_mb, total_mb, pct_used FROM storage_history "
+        "WHERE source='live' ORDER BY ts DESC LIMIT 1",
+        conn_sqlite
+    )
+    if not df_live.empty:
+        r = df_live.iloc[0]
+        print(f"  Letzte Disk-Messung: {r.ts}")
+        print(f"  Auslastung:          {r.pct_used:.1f}% "
+              f"({r.used_mb/1024:.1f} GB von {r.total_mb/1024:.1f} GB)")
+
+    # VRDAT-Stand
+    df_vrdat = pd.read_sql(
+        "SELECT ts, SUM(row_count) AS total_rows FROM vrdat_row_history "
+        "GROUP BY ts ORDER BY ts DESC LIMIT 1",
+        conn_sqlite
+    )
+    if not df_vrdat.empty:
+        r = df_vrdat.iloc[0]
+        print(f"  Letzter VRDAT-Snapshot: {r.ts}")
+        print(f"  Gesamtzeilen VRDAT:     {r.total_rows:,.0f}")
+
+    print()
+
+
+# ===========================================================================
+# MAIN
+# ===========================================================================
+
+def main():
+    print("\n" + "="*60)
+    print("  AS/400 Storage Monitor")
+    print(f"  {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+    print("="*60)
+
+    # SQLite immer öffnen
+    conn_sqlite = sqlite3.connect(SQLITE_PATH)
+    setup_sqlite(conn_sqlite)
+
+    # --- MODUS 2: Excel-Snapshots (immer ausführen wenn Verzeichnis existiert)
+    if os.path.isdir(EXCEL_DIR):
+        run_excel_mode(conn_sqlite)
+    else:
+        print(f"\n[EXCEL] Verzeichnis nicht gefunden: {EXCEL_DIR}")
+        print("        EXCEL_DIR in CONFIG anpassen oder Verzeichnis anlegen.")
+
+    # --- MODUS 1: Live-Abfrage (nur wenn AS/400 erreichbar)
+    print("\n" + "-"*60)
+    live_ok = False
+    try:
+        conn_as400 = pyodbc.connect(
+            f"DSN={ODBC_DSN};", autocommit=True
+        )
+        conn_as400.setdecoding(pyodbc.SQL_CHAR, encoding="cp273")
+        conn_as400.setdecoding(pyodbc.SQL_WCHAR, encoding="utf-16")
+        run_live_mode(conn_as400, conn_sqlite)
+        conn_as400.close()
+        live_ok = True
+    except Exception as e:
+        print(f"\n[LIVE] AS/400-Verbindung fehlgeschlagen: {e}")
+        print("       Excel-Modus wurde trotzdem ausgeführt.")
+
+    # --- Zusammenfassung
+    print_summary_report(conn_sqlite)
+    conn_sqlite.close()
+
+    if not live_ok:
+        print("[HINWEIS] Skript ohne AS/400-Verbindung ausgeführt.")
+        print("          Excel-Trendanalyse ist trotzdem vollständig.")
+
+    print("Fertig.\n")
+
+
+if __name__ == "__main__":
+    main()
