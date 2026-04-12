@@ -1,0 +1,472 @@
+"""
+=============================================================================
+notebook_01_extract.py
+AS/400 Reverse Engineering – Phase 2
+Extraktion: DSPOBJD + DSPPGMREF → Parquet + SQLite
+=============================================================================
+
+Voraussetzungen:
+    pip install pandas pyodbc sqlalchemy
+
+Konfiguration:
+    Passe den Block "── Konfiguration ──" unten an.
+
+Ablauf:
+    1. Parquet-Dateien aus Phase 1 in SQLite laden (falls vorhanden)
+    2. DSPOBJD-Parquet einlesen und in SQLite speichern
+    3. DSPPGMREF-Parquet einlesen und in SQLite speichern
+    4. Erste Plausibilitäts-Checks ausgeben
+
+Aufruf:
+    python notebook_01_extract.py
+    -- oder im Jupyter Notebook: Zelle für Zelle ausführen
+=============================================================================
+"""
+
+import pandas as pd
+import sqlite3
+import logging
+from pathlib import Path
+
+# Optional: pyodbc nur importieren, wenn Live-Abfrage gewünscht
+try:
+    import pyodbc
+    PYODBC_AVAILABLE = True
+except ImportError:
+    PYODBC_AVAILABLE = False
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+
+# =============================================================================
+# ── Konfiguration ─────────────────────────────────────────────────────────────
+# =============================================================================
+
+ODBC_DSN   = "AS400_DSN"          # Name deines ODBC-DSN
+MY_SCHEMA  = "MEINSCHEMA"         # Dein Schema mit Schreibrechten auf der AS/400
+
+SQLITE_DB  = Path("as400_analysis.sqlite")
+PARQUET_DIR = Path("data/raw")
+PARQUET_DIR.mkdir(parents=True, exist_ok=True)
+
+# Pfade zu bereits vorhandenen Parquet-Dateien (aus früheren Läufen)
+# Setze auf None, wenn du live von der AS/400 laden willst (siehe Abschnitt unten)
+DSPOBJD_PARQUET   = Path("data/raw/dspobjd_raw.parquet")    # oder None
+DSPPGMREF_PARQUET = Path("data/raw/dsppgmref_raw.parquet")  # oder None
+PHASE1_PARQUET    = Path("data/phase1/core_tables.parquet") # oder None
+
+
+# =============================================================================
+# ── Spalten-Mapping: DSPOBJD ──────────────────────────────────────────────────
+# =============================================================================
+# Rohe AS/400-Spalten → sprechende Python-Namen
+# Passe die linke Seite an deine tatsächlichen Spaltennamen an!
+
+OBJD_RENAME = {
+    "Objekt":           "pgm_name",
+    "Bibliothek":       "pgm_lib",
+    "ODOBTP":           "obj_type",        # *PGM, *SRVPGM, ...
+    "Objektattribut":   "pgm_attribute",   # RPG, RPGLE, CLLE, CLP, ...
+    "ODOBTX":           "pgm_text",        # Beschreibungstext
+    "ODOBSZ":           "obj_size",        # Objektgröße in Bytes
+    "ODOBOW":           "owner",           # Eigentümer
+    "ODDCEN":           "create_century",  # Erstelldatum – Jahrhundert
+    "ODDDAT":           "create_date",     # Erstelldatum – JJMMTT
+    "ODDTIM":           "create_time",
+    "ODCCEN":           "change_century",  # Änderungsdatum
+    "ODCDAT":           "change_date",
+    "ODCTIM":           "change_time",
+    "ODLCEN":           "last_use_century",
+    "ODLDAT":           "last_use_date",
+    "ODLTIM":           "last_use_time",
+    "ODOBFR":           "obj_fragmentation",
+    "ODOBLK":           "obj_blocked",
+    "ODOBDM":           "obj_domain",
+    "ODCPFL":           "compiler_profile",
+    "ODCMNM":           "compiler_name",
+    "ODCMVR":           "compiler_version",
+    "ODOBLV":           "obj_level",
+    "ODSSQN":           "source_seq",
+    "ODASP":            "asp",
+    "ODLBL":            "label",
+    "ODSCEN":           "save_century",
+    "ODSDAT":           "save_date",
+    "ODSTIM":           "save_time",
+    "ODSCMD":           "save_command",
+    "ODSSZE":           "save_size",
+    "ODSSLT":           "save_sequence",
+    "ODSDEV":           "save_device",
+    # ODSV01–ODSV10 und ODSVMR: Save-Volumes – meist leer, trotzdem behalten
+}
+
+# =============================================================================
+# ── Spalten-Mapping: DSPPGMREF ────────────────────────────────────────────────
+# =============================================================================
+
+PGMREF_RENAME = {
+    "WHLIB":   "pgm_lib",          # Library des aufrufenden Programms
+    "WHPNAM":  "pgm_name",         # Name des aufrufenden Programms
+    "WHTEXT":  "pgm_text",         # Beschreibungstext
+    "WHFNUM":  "file_number",      # Dateinummer
+    "WHDTTM":  "ref_timestamp",    # Zeitstempel der Referenz
+    "WHFNAM":  "ref_object",       # Referenziertes Objekt (Datei, Programm, ...)
+    "WHLNAM":  "ref_lib",          # Library des ref. Objekts
+    "WHSNAM":  "source_member",    # Source-Member-Name
+    "WHRFNO":  "rf_number",        # Record Format Nummer
+    "WHFUSG":  "usage",            # I=Input, O=Output, U=Update, D=Delete
+    "WHRFNM":  "rf_name",          # Record Format Name
+    "WHRFSN":  "rf_seq",           # Record Format Sequenz
+    "WHRFFN":  "rf_field_num",     # Record Format Feldnummer
+    "WHOBJT":  "pgm_obj_type",     # Objekttyp des Programms (*PGM/*SRVPGM)
+    "WHOTYP":  "ref_type",         # Objekttyp der Referenz (*FILE/*PGM/*SRVPGM)
+    "WHSYSN":  "system_name",      # Systemname
+    "WHSPKG":  "service_package",  # Service Package
+    "WHRFNB":  "rf_field_count",   # Anzahl Felder im Record Format
+}
+
+# Usage-Codes: lesbar machen
+USAGE_MAP = {
+    "I": "READ",
+    "O": "WRITE",
+    "U": "UPDATE",
+    "D": "DELETE",
+    " ": "UNKNOWN",
+    "*": "ALL",
+}
+
+
+# =============================================================================
+# ── Hilfsfunktionen ───────────────────────────────────────────────────────────
+# =============================================================================
+
+def load_parquet_or_warn(path: Path, label: str) -> pd.DataFrame | None:
+    """Lädt Parquet, gibt None zurück wenn nicht vorhanden."""
+    if path is None or not path.exists():
+        log.warning(f"{label}: Parquet nicht gefunden: {path}")
+        return None
+    df = pd.read_parquet(path)
+    log.info(f"{label}: {len(df):,} Zeilen aus {path} geladen")
+    return df
+
+
+def build_date_column(df: pd.DataFrame,
+                      century_col: str, date_col: str,
+                      new_col: str) -> pd.DataFrame:
+    """
+    AS/400-Datum zusammenbauen: Century (0=19xx, 1=20xx) + JJMMTT → datetime.
+    Funktioniert auch wenn Century-Spalte fehlt oder leer ist.
+    """
+    if date_col not in df.columns:
+        return df
+    try:
+        if century_col in df.columns:
+            # Century: 0 → 1900, 1 → 2000
+            year_prefix = df[century_col].fillna(0).astype(int).map(
+                {0: "19", 1: "20"}
+            ).fillna("19")
+            full_date = year_prefix + df[date_col].astype(str).str.zfill(6)
+        else:
+            # Kein Century-Feld – direkt parsen (AS/400 gibt manchmal schon 8-stellig)
+            full_date = df[date_col].astype(str)
+        df[new_col] = pd.to_datetime(full_date, format="%Y%m%d", errors="coerce")
+    except Exception as e:
+        log.warning(f"Datumsspalte {new_col} konnte nicht gebaut werden: {e}")
+    return df
+
+
+def clean_objd(df_raw: pd.DataFrame) -> pd.DataFrame:
+    """DSPOBJD bereinigen und anreichern."""
+    df = df_raw.copy()
+
+    # Umbenennen (nur vorhandene Spalten)
+    rename = {k: v for k, v in OBJD_RENAME.items() if k in df.columns}
+    df = df.rename(columns=rename)
+
+    # Strings trimmen
+    str_cols = df.select_dtypes(include="object").columns
+    df[str_cols] = df[str_cols].apply(lambda c: c.str.strip())
+
+    # Datum aufbauen
+    df = build_date_column(df, "create_century", "create_date", "created_at")
+    df = build_date_column(df, "change_century", "change_date", "changed_at")
+    df = build_date_column(df, "last_use_century", "last_use_date", "last_used_at")
+
+    # Programm-Key für spätere JOINs
+    df["pgm_key"] = df["pgm_lib"].str.strip() + "." + df["pgm_name"].str.strip()
+
+    log.info(f"DSPOBJD bereinigt: {len(df):,} Programme, "
+             f"{df['pgm_lib'].nunique()} Libraries, "
+             f"{df['pgm_attribute'].nunique() if 'pgm_attribute' in df.columns else '?'} Sprachen")
+    return df
+
+
+def clean_pgmref(df_raw: pd.DataFrame) -> pd.DataFrame:
+    """DSPPGMREF bereinigen und anreichern."""
+    df = df_raw.copy()
+
+    # Umbenennen
+    rename = {k: v for k, v in PGMREF_RENAME.items() if k in df.columns}
+    df = df.rename(columns=rename)
+
+    # Strings trimmen
+    str_cols = df.select_dtypes(include="object").columns
+    df[str_cols] = df[str_cols].apply(lambda c: c.str.strip())
+
+    # Usage leserlich
+    if "usage" in df.columns:
+        df["usage_label"] = df["usage"].map(USAGE_MAP).fillna("UNKNOWN")
+
+    # Keys
+    df["pgm_key"] = df["pgm_lib"] + "." + df["pgm_name"]
+    df["ref_key"] = df["ref_lib"] + "." + df["ref_object"]
+
+    # Hilfsspalten für spätere Analysen
+    df["is_file_ref"] = df["ref_type"] == "*FILE"
+    df["is_pgm_ref"]  = df["ref_type"].isin(["*PGM", "*SRVPGM"])
+    df["is_write"]    = df["usage"].isin(["O", "U", "D"])
+    df["is_read"]     = df["usage"] == "I"
+
+    log.info(f"DSPPGMREF bereinigt: {len(df):,} Referenzen, "
+             f"{df['pgm_key'].nunique():,} Programme, "
+             f"{df[df['is_file_ref']]['ref_object'].nunique():,} Dateien referenziert")
+    return df
+
+
+def build_sqlite(dfs: dict, db_path: Path):
+    """Alle DataFrames in SQLite schreiben + nützliche Views anlegen."""
+    log.info(f"Schreibe SQLite: {db_path}")
+    with sqlite3.connect(db_path) as db:
+
+        # Tabellen schreiben
+        for tbl_name, df in dfs.items():
+            if df is not None:
+                df.to_sql(tbl_name, db, if_exists="replace", index=False)
+                log.info(f"  Tabelle '{tbl_name}': {len(df):,} Zeilen")
+
+        # ── Views für häufige Abfragen ────────────────────────────────────────
+        views = {
+
+            # Nur Datei-Zugriffe – Basis für die Datenzugriffs-Matrix
+            "v_data_access": """
+                CREATE VIEW IF NOT EXISTS v_data_access AS
+                SELECT
+                    pgm_lib, pgm_name, pgm_key,
+                    ref_object AS table_name,
+                    ref_lib    AS table_lib,
+                    ref_key    AS table_key,
+                    usage, usage_label,
+                    is_write, is_read
+                FROM dsppgmref_clean
+                WHERE is_file_ref = 1
+            """,
+
+            # Nur Programm-Aufrufe – Basis für den Call-Graphen
+            "v_call_edges": """
+                CREATE VIEW IF NOT EXISTS v_call_edges AS
+                SELECT
+                    pgm_lib    AS caller_lib,
+                    pgm_name   AS caller_pgm,
+                    pgm_key    AS caller_key,
+                    ref_object AS called_pgm,
+                    ref_lib    AS called_lib,
+                    ref_key    AS called_key,
+                    ref_type   AS call_type
+                FROM dsppgmref_clean
+                WHERE is_pgm_ref = 1
+            """,
+
+            # Programm-Profil: Wie viel liest/schreibt jedes Programm?
+            "v_pgm_profile": """
+                CREATE VIEW IF NOT EXISTS v_pgm_profile AS
+                SELECT
+                    p.pgm_lib,
+                    p.pgm_name,
+                    p.pgm_key,
+                    p.pgm_attribute,
+                    p.pgm_text,
+                    p.owner,
+                    p.created_at,
+                    p.changed_at,
+                    p.last_used_at,
+                    p.obj_size,
+                    COUNT(DISTINCT r.ref_object)                          AS total_file_refs,
+                    COUNT(DISTINCT CASE WHEN r.is_write=1 THEN r.ref_object END) AS tables_written,
+                    COUNT(DISTINCT CASE WHEN r.is_read=1  THEN r.ref_object END) AS tables_read,
+                    COUNT(DISTINCT c.called_pgm)                          AS calls_out,
+                    COUNT(DISTINCT ci.caller_pgm)                         AS called_by
+                FROM dspobjd_clean p
+                LEFT JOIN v_data_access r  ON p.pgm_key = r.pgm_key
+                LEFT JOIN v_call_edges  c  ON p.pgm_key = c.caller_key
+                LEFT JOIN v_call_edges  ci ON p.pgm_key = ci.called_key
+                GROUP BY p.pgm_lib, p.pgm_name, p.pgm_key,
+                         p.pgm_attribute, p.pgm_text, p.owner,
+                         p.created_at, p.changed_at, p.last_used_at, p.obj_size
+            """,
+
+            # Tabellen-Profil: Welche Tabellen werden am meisten genutzt?
+            "v_table_profile": """
+                CREATE VIEW IF NOT EXISTS v_table_profile AS
+                SELECT
+                    table_lib,
+                    table_name,
+                    table_key,
+                    COUNT(DISTINCT pgm_key)                                   AS pgm_count,
+                    COUNT(DISTINCT CASE WHEN is_read=1  THEN pgm_key END)     AS reader_count,
+                    COUNT(DISTINCT CASE WHEN is_write=1 THEN pgm_key END)     AS writer_count,
+                    COUNT(DISTINCT CASE WHEN usage='D'  THEN pgm_key END)     AS deleter_count
+                FROM v_data_access
+                GROUP BY table_lib, table_name, table_key
+                ORDER BY pgm_count DESC
+            """,
+        }
+
+        for view_name, ddl in views.items():
+            try:
+                db.execute(ddl)
+                log.info(f"  View '{view_name}' angelegt")
+            except Exception as e:
+                log.warning(f"  View '{view_name}' nicht angelegt: {e}")
+
+        db.commit()
+    log.info("✓ SQLite fertig")
+
+
+def plausibility_check(db_path: Path):
+    """Schnelle Plausibilitäts-Ausgabe nach dem Aufbau."""
+    print("\n" + "="*60)
+    print("PLAUSIBILITÄTS-CHECK")
+    print("="*60)
+
+    with sqlite3.connect(db_path) as db:
+        checks = {
+            "Programme (DSPOBJD)":
+                "SELECT COUNT(*) FROM dspobjd_clean",
+            "Referenzen (DSPPGMREF)":
+                "SELECT COUNT(*) FROM dsppgmref_clean",
+            "Datei-Zugriffe":
+                "SELECT COUNT(*) FROM v_data_access",
+            "Call-Graph-Kanten":
+                "SELECT COUNT(*) FROM v_call_edges",
+            "Unique Programme mit Refs":
+                "SELECT COUNT(DISTINCT pgm_key) FROM dsppgmref_clean",
+            "Unique referenzierte Tabellen":
+                "SELECT COUNT(DISTINCT table_key) FROM v_data_access",
+        }
+
+        for label, sql in checks.items():
+            result = db.execute(sql).fetchone()[0]
+            print(f"  {label:<35} {result:>10,}")
+
+        print("\nTop 10 Programme nach Tabellenreferenzen:")
+        top = pd.read_sql("""
+            SELECT pgm_lib, pgm_name, total_file_refs, tables_written, tables_read
+            FROM v_pgm_profile
+            ORDER BY total_file_refs DESC
+            LIMIT 10
+        """, db)
+        print(top.to_string(index=False))
+
+        print("\nTop 10 meistgenutzte Tabellen:")
+        top_tbl = pd.read_sql("""
+            SELECT table_lib, table_name, pgm_count, reader_count, writer_count
+            FROM v_table_profile
+            LIMIT 10
+        """, db)
+        print(top_tbl.to_string(index=False))
+
+    print("="*60)
+
+
+# =============================================================================
+# ── Hauptlauf ─────────────────────────────────────────────────────────────────
+# =============================================================================
+
+def main():
+    log.info("Starte notebook_01_extract.py")
+
+    # 1. Rohdaten laden (aus Parquet oder live – hier: Parquet)
+    df_objd_raw   = load_parquet_or_warn(DSPOBJD_PARQUET,   "DSPOBJD")
+    df_pgmref_raw = load_parquet_or_warn(DSPPGMREF_PARQUET, "DSPPGMREF")
+
+    if df_objd_raw is None or df_pgmref_raw is None:
+        log.error("Mindestens eine Rohdaten-Quelle fehlt. Bitte Pfade prüfen.")
+        return
+
+    # 2. Bereinigen
+    df_objd_clean   = clean_objd(df_objd_raw)
+    df_pgmref_clean = clean_pgmref(df_pgmref_raw)
+
+    # 3. Bereinigte Parquets speichern
+    df_objd_clean.to_parquet(PARQUET_DIR / "dspobjd_clean.parquet",   index=False)
+    df_pgmref_clean.to_parquet(PARQUET_DIR / "dsppgmref_clean.parquet", index=False)
+    log.info("Bereinigte Parquet-Dateien gespeichert")
+
+    # 4. SQLite aufbauen
+    dfs = {
+        "dspobjd_raw":     df_objd_raw,
+        "dspobjd_clean":   df_objd_clean,
+        "dsppgmref_raw":   df_pgmref_raw,
+        "dsppgmref_clean": df_pgmref_clean,
+    }
+
+    # Phase-1-Tabellen optional einbinden
+    df_phase1 = load_parquet_or_warn(PHASE1_PARQUET, "Phase1-Kerntabellen")
+    if df_phase1 is not None:
+        dfs["phase1_core_tables"] = df_phase1
+
+    build_sqlite(dfs, SQLITE_DB)
+
+    # 5. Plausibilitäts-Check
+    plausibility_check(SQLITE_DB)
+
+    log.info("✓ Fertig – as400_analysis.sqlite ist bereit für Notebook 02")
+
+
+if __name__ == "__main__":
+    main()
+
+
+# =============================================================================
+# ── ANHANG: Live-Abfrage von der AS/400 (optional) ───────────────────────────
+# =============================================================================
+# Wenn du die Daten direkt von der AS/400 ziehen willst statt aus Parquet,
+# nutze diesen Block (auskommentiert lassen für Parquet-Modus):
+#
+# def fetch_live_from_as400():
+#     import time
+#     conn = pyodbc.connect(f"DSN={ODBC_DSN}", autocommit=True)
+#     crsr = conn.cursor()
+#
+#     # DSPOBJD – alle Programme in allen Libraries
+#     outfile_objd = f"{MY_SCHEMA}/OBJD_WORK"
+#     for i, lib in enumerate(TARGET_LIBS):
+#         mbr = "*REPLACE" if i == 0 else "*ADD"
+#         cl = (f"DSPOBJD OBJ({lib}/*ALL) OBJTYPE(*PGM) "
+#               f"OUTPUT(*OUTFILE) OUTFILE({outfile_objd}) OUTMBR(*FIRST {mbr})")
+#         crsr.execute(f"CALL QSYS2.QCMDEXC('{cl}')")
+#         time.sleep(0.3)
+#
+#     time.sleep(1)
+#     df_objd = pd.read_sql(f"SELECT * FROM {outfile_objd}", conn)
+#
+#     # DSPPGMREF
+#     outfile_ref = f"{MY_SCHEMA}/PGMREF_WORK"
+#     for i, lib in enumerate(TARGET_LIBS):
+#         mbr = "*REPLACE" if i == 0 else "*ADD"
+#         cl = (f"DSPPGMREF PGM({lib}/*ALL) "
+#               f"OUTPUT(*OUTFILE) OUTFILE({outfile_ref}) OUTMBR(*FIRST {mbr})")
+#         crsr.execute(f"CALL QSYS2.QCMDEXC('{cl}')")
+#         time.sleep(0.3)
+#
+#     time.sleep(1)
+#     df_pgmref = pd.read_sql(f"SELECT * FROM {outfile_ref}", conn)
+#     conn.close()
+#
+#     df_objd.to_parquet(PARQUET_DIR / "dspobjd_raw.parquet",   index=False)
+#     df_pgmref.to_parquet(PARQUET_DIR / "dsppgmref_raw.parquet", index=False)
+#     return df_objd, df_pgmref
