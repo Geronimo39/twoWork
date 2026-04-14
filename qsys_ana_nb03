@@ -1,0 +1,586 @@
+"""
+=============================================================================
+nb_03_visualize.py
+AS/400 Reverse Engineering – Visualisierungen
+=============================================================================
+Voraussetzung: nb_01 + nb_02 wurden ausgeführt → as400_analysis.sqlite
+
+Erzeugte Charts (gespeichert als PNG + HTML):
+    01  Programmiersprachen-Verteilung (Donut)
+    02  Programme nach Kategorie je Library (Stacked Bar)
+    03  Top-30 Programme – Importance Score (Horizontal Bar)
+    04  Top-30 Tabellen – Importance Score (Horizontal Bar)
+    05  Read/Write-Matrix – Heatmap
+    06  Dead-Code vs. Aktive Programme (Sunburst)
+    07  Call-Graph – NetworkX/pyvis (interaktiv, HTML)
+    08  Tabellen-Größe vs. Nutzungsintensität (Bubble Chart)
+    09  Trigger-Übersicht (Heatmap: Tabelle × Event)
+    10  Erstellungsjahr-Verteilung Programme (Histogramm)
+    11  Write-Ratio-Verteilung (Scatter: Schreiben vs. Lesen)
+    12  Executive Summary Dashboard (kombiniert, HTML)
+=============================================================================
+"""
+
+import sqlite3
+import logging
+import warnings
+from pathlib import Path
+
+import pandas as pd
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.patches import FancyBboxPatch
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+# Optional: pyvis für interaktiven Call-Graphen
+try:
+    import networkx as nx
+    NX_AVAILABLE = True
+except ImportError:
+    NX_AVAILABLE = False
+    log.warning("networkx nicht installiert – Call-Graph übersprungen")
+
+try:
+    from pyvis.network import Network
+    PYVIS_AVAILABLE = True
+except ImportError:
+    PYVIS_AVAILABLE = False
+    log.warning("pyvis nicht installiert – interaktiver Graph übersprungen")
+
+# =============================================================================
+# ── Konfiguration ─────────────────────────────────────────────────────────────
+# =============================================================================
+
+SQLITE_DB  = Path("as400_analysis.sqlite")
+OUTPUT_DIR = Path("output/charts")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Farbpalette (vorstandstauglich)
+COLORS = {
+    "HIGH":   "#c0392b",
+    "MEDIUM": "#e67e22",
+    "LOW":    "#3498db",
+    "UNUSED": "#95a5a6",
+    "HOT":    "#c0392b",
+    "COLD":   "#95a5a6",
+    "READ":   "#2980b9",
+    "WRITE":  "#c0392b",
+    "RW":     "#8e44ad",
+    "accent": "#2c3e50",
+    "bg":     "#f8f9fa",
+}
+
+PALETTE = ["#2c3e50","#e74c3c","#3498db","#2ecc71","#f39c12",
+           "#9b59b6","#1abc9c","#e67e22","#34495e","#e91e63"]
+
+
+def save(fig, name: str):
+    path = OUTPUT_DIR / f"{name}.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    log.info(f"  Gespeichert: {path}")
+    return path
+
+
+def load(sql: str, db) -> pd.DataFrame:
+    try:
+        return pd.read_sql(sql, db)
+    except Exception as e:
+        log.warning(f"Abfrage fehlgeschlagen: {e}")
+        return pd.DataFrame()
+
+
+# =============================================================================
+# ── Chart-Funktionen ──────────────────────────────────────────────────────────
+# =============================================================================
+
+def chart_01_sprachen(db):
+    """Donut: Verteilung Programmiersprachen gesamt."""
+    log.info("Chart 01: Programmiersprachen")
+    df = load("""
+        SELECT language, SUM(pgm_count) AS n
+        FROM pgm_language_dist
+        GROUP BY language ORDER BY n DESC
+    """, db)
+    if df.empty: return
+
+    # Kleine Gruppen zusammenfassen
+    threshold = df["n"].sum() * 0.02
+    df_main = df[df["n"] >= threshold].copy()
+    rest = df[df["n"] < threshold]["n"].sum()
+    if rest > 0:
+        df_main = pd.concat([df_main,
+            pd.DataFrame([{"language":"Sonstige","n":rest}])], ignore_index=True)
+
+    fig, ax = plt.subplots(figsize=(9, 7))
+    wedges, texts, autotexts = ax.pie(
+        df_main["n"], labels=df_main["language"],
+        autopct="%1.1f%%", startangle=90,
+        colors=PALETTE[:len(df_main)],
+        wedgeprops=dict(width=0.55, edgecolor="white", linewidth=2),
+        pctdistance=0.75
+    )
+    for t in autotexts:
+        t.set_fontsize(9)
+        t.set_color("white")
+        t.set_fontweight("bold")
+
+    ax.set_title("Programmiersprachen-Verteilung", fontsize=14,
+                 fontweight="bold", pad=20, color=COLORS["accent"])
+    fig.patch.set_facecolor("white")
+    save(fig, "01_sprachen_donut")
+
+
+def chart_02_lib_kategorien(db):
+    """Stacked Bar: Programme je Library nach Kategorie."""
+    log.info("Chart 02: Library-Kategorien")
+    df = load("""
+        SELECT p.pgm_lib,
+               SUM(CASE WHEN p.category='HIGH'   THEN 1 ELSE 0 END) AS HIGH,
+               SUM(CASE WHEN p.category='MEDIUM' THEN 1 ELSE 0 END) AS MEDIUM,
+               SUM(CASE WHEN p.category='LOW'    THEN 1 ELSE 0 END) AS LOW,
+               SUM(CASE WHEN p.category='UNUSED' THEN 1 ELSE 0 END) AS UNUSED
+        FROM pgm_importance p
+        GROUP BY p.pgm_lib ORDER BY HIGH+MEDIUM DESC
+    """, db)
+    if df.empty or len(df) == 0: return
+
+    df = df.head(15)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    cats = ["HIGH","MEDIUM","LOW","UNUSED"]
+    bottom = np.zeros(len(df))
+    for cat in cats:
+        if cat in df.columns:
+            vals = df[cat].fillna(0).values
+            bars = ax.bar(df["pgm_lib"], vals, bottom=bottom,
+                          color=COLORS[cat], label=cat, edgecolor="white")
+            bottom += vals
+
+    ax.set_xlabel("Library", fontsize=11)
+    ax.set_ylabel("Anzahl Programme", fontsize=11)
+    ax.set_title("Programme je Library nach Wichtigkeits-Kategorie",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.legend(loc="upper right", framealpha=0.9)
+    ax.set_facecolor(COLORS["bg"])
+    plt.xticks(rotation=30, ha="right")
+    plt.tight_layout()
+    save(fig, "02_lib_kategorien")
+
+
+def chart_03_top_programme(db):
+    """Horizontal Bar: Top-30 Programme nach Importance Score."""
+    log.info("Chart 03: Top Programme")
+    df = load("""
+        SELECT pgm_name || ' (' || pgm_lib || ')' AS label,
+               score, category, pgm_attribute
+        FROM pgm_importance ORDER BY score DESC LIMIT 30
+    """, db)
+    if df.empty: return
+
+    df = df.iloc[::-1]  # umkehren für horizontalen Plot
+    colors = [COLORS.get(c, COLORS["LOW"]) for c in df["category"]]
+
+    fig, ax = plt.subplots(figsize=(11, 10))
+    bars = ax.barh(df["label"], df["score"], color=colors,
+                   edgecolor="white", height=0.7)
+
+    # Werte beschriften
+    for bar, val in zip(bars, df["score"]):
+        ax.text(val + 0.5, bar.get_y() + bar.get_height()/2,
+                f"{val:.1f}", va="center", fontsize=8, color=COLORS["accent"])
+
+    ax.set_xlabel("Importance Score (0–100)", fontsize=11)
+    ax.set_title("Top 30 Programme – Wichtigkeits-Score",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.set_facecolor(COLORS["bg"])
+    ax.axvline(x=60, color=COLORS["HIGH"],   linestyle="--", alpha=0.4, label="HIGH-Grenze")
+    ax.axvline(x=30, color=COLORS["MEDIUM"], linestyle="--", alpha=0.4, label="MEDIUM-Grenze")
+    ax.legend(fontsize=9)
+    plt.tight_layout()
+    save(fig, "03_top_programme")
+
+
+def chart_04_top_tabellen(db):
+    """Horizontal Bar: Top-30 Tabellen nach Score."""
+    log.info("Chart 04: Top Tabellen")
+    df = load("""
+        SELECT table_name || ' (' || table_lib || ')' AS label,
+               score, category, pgm_count, writers, readers
+        FROM table_importance ORDER BY score DESC LIMIT 30
+    """, db)
+    if df.empty: return
+
+    df = df.iloc[::-1]
+    colors = [COLORS.get(c, COLORS["LOW"]) for c in df["category"]]
+
+    fig, ax = plt.subplots(figsize=(11, 10))
+    ax.barh(df["label"], df["score"], color=colors, edgecolor="white", height=0.7)
+    ax.set_xlabel("Importance Score (0–100)", fontsize=11)
+    ax.set_title("Top 30 Tabellen – Wichtigkeits-Score",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.set_facecolor(COLORS["bg"])
+    plt.tight_layout()
+    save(fig, "04_top_tabellen")
+
+
+def chart_05_rw_heatmap(db):
+    """Heatmap: Read/Write-Matrix."""
+    log.info("Chart 05: RW-Heatmap")
+    df = load("SELECT * FROM rw_matrix_numeric", db)
+    if df.empty: return
+
+    if "pgm_key" in df.columns:
+        df = df.set_index("pgm_key")
+
+    # Kurzbezeichnungen (letzter Teil nach '.')
+    df.index   = [str(i).split(".")[-1] for i in df.index]
+    df.columns = [str(c).split(".")[-1] for c in df.columns]
+
+    fig, ax = plt.subplots(figsize=(max(14, len(df.columns)//2),
+                                    max(10, len(df)//2)))
+    cmap = mcolors.ListedColormap(["#ecf0f1","#2980b9","#c0392b","#8e44ad"])
+    bounds = [-0.5, 0.5, 1.5, 2.5, 3.5]
+    norm   = mcolors.BoundaryNorm(bounds, cmap.N)
+
+    im = ax.imshow(df.values, cmap=cmap, norm=norm, aspect="auto")
+    cbar = plt.colorbar(im, ax=ax, ticks=[0,1,2,3])
+    cbar.set_ticklabels(["–","Read","Write","Read+Write"])
+
+    ax.set_xticks(range(len(df.columns)))
+    ax.set_yticks(range(len(df.index)))
+    ax.set_xticklabels(df.columns, rotation=60, ha="right", fontsize=7)
+    ax.set_yticklabels(df.index, fontsize=7)
+    ax.set_title("Datenzugriffs-Matrix: Programme × Tabellen",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"], pad=15)
+    plt.tight_layout()
+    save(fig, "05_rw_heatmap")
+
+
+def chart_06_dead_vs_active(db):
+    """Balken: Aktive vs. inaktive Programme je Library."""
+    log.info("Chart 06: Dead-Code vs. Aktiv")
+    df = load("""
+        SELECT pgm_lib, active_pgms, pgm_total - active_pgms AS inactive
+        FROM lib_summary ORDER BY pgm_total DESC LIMIT 15
+    """, db)
+    if df.empty: return
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    x = np.arange(len(df))
+    w = 0.4
+    ax.bar(x - w/2, df["active_pgms"],  width=w, label="Aktiv",   color="#2ecc71", edgecolor="white")
+    ax.bar(x + w/2, df["inactive"],     width=w, label="Inaktiv", color="#95a5a6", edgecolor="white")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(df["pgm_lib"], rotation=30, ha="right")
+    ax.set_ylabel("Anzahl Programme")
+    ax.set_title("Aktive vs. inaktive Programme je Library",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.legend()
+    ax.set_facecolor(COLORS["bg"])
+    plt.tight_layout()
+    save(fig, "06_dead_vs_active")
+
+
+def chart_07_call_graph(db):
+    """Interaktiver Call-Graph mit pyvis."""
+    log.info("Chart 07: Call-Graph")
+    if not (NX_AVAILABLE and PYVIS_AVAILABLE):
+        log.warning("  networkx oder pyvis fehlt – übersprungen")
+        return
+
+    df_edges = load("""
+        SELECT caller_pgm, called_pgm, caller_lib
+        FROM v_call_edges LIMIT 500
+    """, db)
+    df_scores = load("""
+        SELECT pgm_name, pgm_lib, score, category
+        FROM pgm_importance
+    """, db)
+    if df_edges.empty: return
+
+    G = nx.DiGraph()
+    for _, row in df_edges.iterrows():
+        G.add_edge(row["caller_pgm"], row["called_pgm"])
+
+    # Scores als Attribute
+    score_map = dict(zip(df_scores["pgm_name"], df_scores["score"]))
+    cat_map   = dict(zip(df_scores["pgm_name"], df_scores["category"]))
+
+    color_map = {"HIGH":"#c0392b","MEDIUM":"#e67e22","LOW":"#3498db","UNUSED":"#95a5a6"}
+
+    net = Network(height="750px", width="100%", bgcolor="#1a1a2e",
+                  font_color="white", directed=True)
+    net.barnes_hut(gravity=-8000, central_gravity=0.3, spring_length=120)
+
+    for node in G.nodes():
+        score = score_map.get(node, 0)
+        cat   = cat_map.get(node, "LOW")
+        size  = max(10, min(40, score / 2))
+        net.add_node(node, label=node, size=size,
+                     color=color_map.get(cat, "#3498db"),
+                     title=f"{node}<br>Score: {score}<br>Kategorie: {cat}")
+
+    for src, tgt in G.edges():
+        net.add_edge(src, tgt, color="#555555", width=1)
+
+    out_path = OUTPUT_DIR / "07_call_graph.html"
+    net.save_graph(str(out_path))
+    log.info(f"  Call-Graph gespeichert: {out_path}")
+
+
+def chart_08_bubble(db):
+    """Bubble: Tabellen – Zeilenzahl vs. Nutzungsintensität."""
+    log.info("Chart 08: Bubble Chart Tabellen")
+    df = load("""
+        SELECT table_name, table_lib, row_count, pgm_count, writers, score
+        FROM table_importance
+        WHERE row_count > 0 AND pgm_count > 0
+        ORDER BY score DESC LIMIT 40
+    """, db)
+    if df.empty: return
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    scatter = ax.scatter(
+        np.log1p(df["row_count"]),
+        df["pgm_count"],
+        s=df["writers"] * 30 + 30,
+        c=df["score"],
+        cmap="RdYlGn_r",
+        alpha=0.75,
+        edgecolors="white",
+        linewidths=0.5
+    )
+    plt.colorbar(scatter, label="Importance Score")
+
+    for _, row in df.head(15).iterrows():
+        ax.annotate(row["table_name"],
+                    (np.log1p(row["row_count"]), row["pgm_count"]),
+                    fontsize=7, alpha=0.8,
+                    xytext=(4, 4), textcoords="offset points")
+
+    ax.set_xlabel("Zeilenzahl (log)", fontsize=11)
+    ax.set_ylabel("Anzahl zugreifende Programme", fontsize=11)
+    ax.set_title("Tabellen: Größe × Nutzungsintensität\n(Blasengröße = Anzahl Schreiber)",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.set_facecolor(COLORS["bg"])
+    plt.tight_layout()
+    save(fig, "08_tabellen_bubble")
+
+
+def chart_09_trigger_heatmap(db):
+    """Heatmap: Trigger je Tabelle × Event-Typ."""
+    log.info("Chart 09: Trigger-Heatmap")
+    df = load("""
+        SELECT table_name, event_manipulation, COUNT(*) AS n
+        FROM trigger_impact
+        GROUP BY table_name, event_manipulation
+    """, db)
+    if df.empty:
+        log.warning("  Keine Trigger-Daten")
+        return
+
+    pivot = df.pivot_table(
+        index="table_name", columns="event_manipulation",
+        values="n", fill_value=0
+    )
+    if pivot.empty: return
+
+    fig, ax = plt.subplots(figsize=(max(8, len(pivot.columns)*2),
+                                    max(6, len(pivot)*0.4 + 2)))
+    sns.heatmap(pivot, annot=True, fmt="d", cmap="YlOrRd",
+                linewidths=0.5, ax=ax, cbar_kws={"label":"Anzahl Trigger"})
+    ax.set_title("Trigger je Tabelle × Event-Typ",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"], pad=15)
+    ax.set_xlabel("Event")
+    ax.set_ylabel("Tabelle")
+    plt.tight_layout()
+    save(fig, "09_trigger_heatmap")
+
+
+def chart_10_erstellungsjahr(db):
+    """Histogramm: Erstellungsjahr Programme."""
+    log.info("Chart 10: Erstellungsjahr")
+    df = load("""
+        SELECT created_at FROM dspobjd_clean
+        WHERE created_at IS NOT NULL
+    """, db)
+    if df.empty: return
+
+    df["year"] = pd.to_datetime(df["created_at"], errors="coerce").dt.year
+    df = df.dropna(subset=["year"])
+    df["year"] = df["year"].astype(int)
+    df = df[(df["year"] >= 1980) & (df["year"] <= 2030)]
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.hist(df["year"], bins=range(df["year"].min(), df["year"].max()+2),
+            color=COLORS["accent"], edgecolor="white", alpha=0.85)
+    ax.set_xlabel("Erstellungsjahr", fontsize=11)
+    ax.set_ylabel("Anzahl Programme", fontsize=11)
+    ax.set_title("Programme nach Erstellungsjahr",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.set_facecolor(COLORS["bg"])
+    plt.tight_layout()
+    save(fig, "10_erstellungsjahr")
+
+
+def chart_11_write_scatter(db):
+    """Scatter: Schreibende vs. lesende Tabellen je Programm."""
+    log.info("Chart 11: Write-Ratio Scatter")
+    df = load("""
+        SELECT pgm_name, pgm_lib, tbl_written AS written,
+               tbl_read AS read_only, days_used, category
+        FROM pgm_importance
+        WHERE written + read_only > 0
+    """, db)
+    if df.empty: return
+
+    colors = [COLORS.get(c,"#95a5a6") for c in df["category"]]
+    sizes  = np.clip(df["days_used"].fillna(0) * 2 + 20, 20, 200)
+
+    fig, ax = plt.subplots(figsize=(11, 8))
+    ax.scatter(df["read_only"], df["written"],
+               c=colors, s=sizes, alpha=0.65, edgecolors="white", linewidths=0.5)
+
+    # Diagonale = 50/50
+    mx = max(df["read_only"].max(), df["written"].max()) + 1
+    ax.plot([0, mx], [0, mx], "--", color="#bdc3c7", alpha=0.5, label="50/50-Linie")
+    ax.fill_between([0,mx],[0,mx],[mx,mx], alpha=0.04, color="#c0392b",
+                    label="Mehr Schreiben")
+    ax.fill_between([0,mx],[0,0],[0,mx], alpha=0.04, color="#2980b9",
+                    label="Mehr Lesen")
+
+    # Top-Programme beschriften
+    top = df.nlargest(12, "written")
+    for _, r in top.iterrows():
+        ax.annotate(r["pgm_name"], (r["read_only"], r["written"]),
+                    fontsize=7, xytext=(3,3), textcoords="offset points")
+
+    ax.set_xlabel("Gelesene Tabellen", fontsize=11)
+    ax.set_ylabel("Geschriebene Tabellen", fontsize=11)
+    ax.set_title("Programme: Lesen vs. Schreiben\n(Größe = Nutzungstage)",
+                 fontsize=13, fontweight="bold", color=COLORS["accent"])
+    ax.legend(fontsize=9)
+    ax.set_facecolor(COLORS["bg"])
+    plt.tight_layout()
+    save(fig, "11_write_scatter")
+
+
+def chart_12_executive_dashboard(db):
+    """Executive Dashboard: Kombination aus 4 Kernkennzahlen."""
+    log.info("Chart 12: Executive Dashboard")
+
+    df_pgm = load("SELECT category, COUNT(*) AS n FROM pgm_importance GROUP BY category", db)
+    df_tbl = load("SELECT category, COUNT(*) AS n FROM table_importance GROUP BY category", db)
+    df_lib = load("SELECT pgm_lib, pgm_total, active_pgms FROM lib_summary ORDER BY pgm_total DESC LIMIT 10", db)
+    df_top = load("SELECT pgm_name, pgm_lib, score FROM pgm_importance ORDER BY score DESC LIMIT 10", db)
+
+    fig = plt.figure(figsize=(18, 12))
+    fig.patch.set_facecolor("#1a1a2e")
+
+    # Titel
+    fig.text(0.5, 0.96, "AS/400 Systemanalyse – Executive Dashboard",
+             ha="center", fontsize=18, fontweight="bold", color="white")
+    fig.text(0.5, 0.93, "Reverse Engineering | Programmlogik & Systemstruktur",
+             ha="center", fontsize=11, color="#7f8c8d")
+
+    ax_cat = fig.add_axes([0.04, 0.55, 0.28, 0.33])
+    if not df_pgm.empty:
+        cat_colors = [COLORS.get(c,"#3498db") for c in df_pgm["category"]]
+        ax_cat.bar(df_pgm["category"], df_pgm["n"], color=cat_colors, edgecolor="#1a1a2e")
+        ax_cat.set_facecolor("#16213e")
+        ax_cat.tick_params(colors="white")
+        ax_cat.set_title("Programme nach Kategorie", color="white", fontsize=11, pad=8)
+        for spine in ax_cat.spines.values(): spine.set_color("#2c3e50")
+        for bar, n in zip(ax_cat.patches, df_pgm["n"]):
+            ax_cat.text(bar.get_x()+bar.get_width()/2, bar.get_height()+0.5,
+                        str(n), ha="center", color="white", fontsize=9)
+
+    ax_tbl = fig.add_axes([0.37, 0.55, 0.28, 0.33])
+    if not df_tbl.empty:
+        cat_colors_t = [COLORS.get(c,"#3498db") for c in df_tbl["category"]]
+        ax_tbl.bar(df_tbl["category"], df_tbl["n"], color=cat_colors_t, edgecolor="#1a1a2e")
+        ax_tbl.set_facecolor("#16213e")
+        ax_tbl.tick_params(colors="white")
+        ax_tbl.set_title("Tabellen nach Kategorie", color="white", fontsize=11, pad=8)
+        for spine in ax_tbl.spines.values(): spine.set_color("#2c3e50")
+
+    ax_lib = fig.add_axes([0.70, 0.55, 0.28, 0.33])
+    if not df_lib.empty:
+        ax_lib.barh(df_lib["pgm_lib"][::-1], df_lib["pgm_total"][::-1],
+                    color="#3498db", edgecolor="#1a1a2e", label="Gesamt", alpha=0.7)
+        ax_lib.barh(df_lib["pgm_lib"][::-1], df_lib["active_pgms"][::-1],
+                    color="#2ecc71", edgecolor="#1a1a2e", label="Aktiv")
+        ax_lib.set_facecolor("#16213e")
+        ax_lib.tick_params(colors="white")
+        ax_lib.set_title("Aktive vs. Gesamt je Library", color="white", fontsize=11, pad=8)
+        ax_lib.legend(fontsize=8, facecolor="#16213e", labelcolor="white")
+        for spine in ax_lib.spines.values(): spine.set_color("#2c3e50")
+
+    ax_top = fig.add_axes([0.04, 0.08, 0.92, 0.38])
+    if not df_top.empty:
+        df_top_sorted = df_top.sort_values("score")
+        bar_colors = plt.cm.RdYlGn(df_top_sorted["score"] / 100)
+        bars = ax_top.barh(
+            df_top_sorted["pgm_name"] + " (" + df_top_sorted["pgm_lib"] + ")",
+            df_top_sorted["score"], color=bar_colors, edgecolor="#1a1a2e", height=0.6
+        )
+        ax_top.set_facecolor("#16213e")
+        ax_top.tick_params(colors="white")
+        ax_top.set_title("Top 10 Programme – Wichtigkeits-Score",
+                         color="white", fontsize=11, pad=8)
+        ax_top.set_xlabel("Score (0–100)", color="white")
+        for spine in ax_top.spines.values(): spine.set_color("#2c3e50")
+        for bar, score in zip(bars, df_top_sorted["score"]):
+            ax_top.text(score + 0.5, bar.get_y() + bar.get_height()/2,
+                        f"{score:.1f}", va="center", color="white", fontsize=9)
+
+    out_path = OUTPUT_DIR / "12_executive_dashboard.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight", facecolor="#1a1a2e")
+    plt.close(fig)
+    log.info(f"  Gespeichert: {out_path}")
+
+
+# =============================================================================
+# ── Hauptlauf ─────────────────────────────────────────────────────────────────
+# =============================================================================
+
+def main():
+    log.info("nb_03_visualize.py – Start")
+    if not SQLITE_DB.exists():
+        log.error(f"SQLite nicht gefunden: {SQLITE_DB}")
+        return
+
+    with sqlite3.connect(SQLITE_DB) as db:
+        chart_01_sprachen(db)
+        chart_02_lib_kategorien(db)
+        chart_03_top_programme(db)
+        chart_04_top_tabellen(db)
+        chart_05_rw_heatmap(db)
+        chart_06_dead_vs_active(db)
+        chart_07_call_graph(db)
+        chart_08_bubble(db)
+        chart_09_trigger_heatmap(db)
+        chart_10_erstellungsjahr(db)
+        chart_11_write_scatter(db)
+        chart_12_executive_dashboard(db)
+
+    charts = list(OUTPUT_DIR.glob("*.png")) + list(OUTPUT_DIR.glob("*.html"))
+    log.info(f"\n✓ {len(charts)} Ausgaben erstellt in: {OUTPUT_DIR}")
+    for c in sorted(charts):
+        log.info(f"   {c.name}")
+
+
+if __name__ == "__main__":
+    main()
