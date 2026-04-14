@@ -1,0 +1,327 @@
+"""
+=============================================================================
+nb_02_analyse.py
+AS/400 Reverse Engineering – Analysen
+=============================================================================
+Voraussetzung: nb_01_extract.py wurde ausgeführt → as400_analysis.sqlite
+
+Erzeugte Analyse-Tabellen in SQLite:
+    - pgm_importance        : Wichtigkeits-Score je Programm
+    - table_importance      : Wichtigkeits-Score je Tabelle
+    - pgm_language_dist     : Verteilung Programmiersprachen
+    - lib_summary           : Übersicht je Library
+    - call_degrees          : In/Out-Degree je Programm
+    - dead_code_candidates  : Programme ohne Nutzung
+    - write_heavy_pgms      : Programme mit hohem Schreibanteil
+    - trigger_impact        : Trigger × Tabellen × Programme
+    - rw_matrix             : Read/Write-Matrix (Text)
+    - rw_matrix_numeric     : Read/Write-Matrix (numerisch, für Heatmap)
+=============================================================================
+"""
+
+import pandas as pd
+import sqlite3
+import logging
+from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+SQLITE_DB = Path("as400_analysis.sqlite")
+
+
+def read(sql, db):
+    return pd.read_sql(sql, db)
+
+def write(df, name, db):
+    df.to_sql(name, db, if_exists="replace", index=False)
+    log.info(f"  '{name}': {len(df):,} Zeilen")
+
+
+def analyse_programme(db):
+    log.info("Programm-Wichtigkeit ...")
+    df = read("""
+        SELECT pgm_key, pgm_lib, pgm_name, pgm_attribute, pgm_text, owner,
+               created_at, changed_at, last_used_at, obj_size,
+               COALESCE(days_used_count,0) AS days_used,
+               COALESCE(total_file_refs,0) AS file_refs,
+               COALESCE(tables_written,0)  AS tbl_written,
+               COALESCE(tables_read,0)     AS tbl_read,
+               COALESCE(calls_out,0)       AS calls_out
+        FROM v_pgm_profile
+    """, db)
+    if df.empty:
+        return df
+
+    df_in = read("""
+        SELECT called_key, COUNT(*) AS called_by_n
+        FROM v_call_edges GROUP BY called_key
+    """, db)
+    df = df.merge(df_in, left_on="pgm_key", right_on="called_key", how="left")
+    df["called_by_n"] = df["called_by_n"].fillna(0).astype(int)
+
+    def norm(s):
+        mx = s.max()
+        return (s / mx * 100).round(1) if mx > 0 else s * 0
+
+    df["score"] = (
+        norm(df["days_used"])   * 0.30 +
+        norm(df["tbl_written"]) * 0.25 +
+        norm(df["file_refs"])   * 0.20 +
+        norm(df["calls_out"])   * 0.15 +
+        norm(df["called_by_n"]) * 0.10
+    ).round(1)
+
+    df = df.sort_values("score", ascending=False).reset_index(drop=True)
+    df["rank"] = df.index + 1
+    df["category"] = pd.cut(
+        df["score"], bins=[-1,10,30,60,101],
+        labels=["UNUSED","LOW","MEDIUM","HIGH"]
+    ).astype(str)
+    write(df, "pgm_importance", db)
+    return df
+
+
+def analyse_tabellen(db):
+    log.info("Tabellen-Wichtigkeit ...")
+    df = read("""
+        SELECT table_key, table_lib, table_name, table_text,
+               COALESCE(number_rows,0)   AS row_count,
+               COALESCE(pgm_count,0)     AS pgm_count,
+               COALESCE(reader_count,0)  AS readers,
+               COALESCE(writer_count,0)  AS writers,
+               COALESCE(deleter_count,0) AS deleters,
+               COALESCE(index_count,0)   AS indexes,
+               COALESCE(tbl_days_used,0) AS days_used
+        FROM v_table_profile
+    """, db)
+    if df.empty:
+        return df
+
+    def norm(s):
+        mx = s.max()
+        return (s / mx * 100).round(1) if mx > 0 else s * 0
+
+    df["score"] = (
+        norm(df["pgm_count"]) * 0.35 +
+        norm(df["writers"])   * 0.30 +
+        norm(df["days_used"]) * 0.20 +
+        norm(df["indexes"])   * 0.15
+    ).round(1)
+
+    df = df.sort_values("score", ascending=False).reset_index(drop=True)
+    df["rank"] = df.index + 1
+    df["category"] = pd.cut(
+        df["score"], bins=[-1,10,30,60,101],
+        labels=["COLD","LOW","MEDIUM","HOT"]
+    ).astype(str)
+    write(df, "table_importance", db)
+    return df
+
+
+def analyse_sprachen(db):
+    log.info("Programmiersprachen ...")
+    df = read("""
+        SELECT pgm_lib,
+               COALESCE(pgm_attribute,'UNBEKANNT') AS language,
+               COUNT(*) AS pgm_count,
+               ROUND(COUNT(*)*100.0/SUM(COUNT(*)) OVER (PARTITION BY pgm_lib),1) AS pct
+        FROM dspobjd_clean
+        GROUP BY pgm_lib, language
+        ORDER BY pgm_lib, pgm_count DESC
+    """, db)
+    write(df, "pgm_language_dist", db)
+    return df
+
+
+def analyse_libraries(db):
+    log.info("Library-Übersicht ...")
+    df = read("""
+        SELECT o.pgm_lib,
+               COUNT(DISTINCT o.pgm_name) AS pgm_total,
+               COUNT(DISTINCT CASE WHEN o.pgm_attribute IN ('RPG','RPGLE','RPG38')
+                              THEN o.pgm_name END) AS rpg_count,
+               COUNT(DISTINCT CASE WHEN o.pgm_attribute IN ('CLLE','CLP','CL')
+                              THEN o.pgm_name END) AS cl_count,
+               COUNT(DISTINCT CASE WHEN COALESCE(s.days_used_count,0)>0
+                              THEN o.pgm_name END) AS active_pgms,
+               ROUND(AVG(COALESCE(s.days_used_count,0)),1) AS avg_days_used,
+               SUM(COALESCE(o.obj_size,0)) AS total_size_bytes
+        FROM dspobjd_clean o
+        LEFT JOIN sysprogramstat s ON o.pgm_name=s.program_name
+                                   AND o.pgm_lib=s.program_schema
+        GROUP BY o.pgm_lib ORDER BY pgm_total DESC
+    """, db)
+    write(df, "lib_summary", db)
+    return df
+
+
+def analyse_call_degrees(db):
+    log.info("Call-Graph Degrees ...")
+    df_out = read("""
+        SELECT caller_key AS pgm_key, caller_lib AS pgm_lib,
+               caller_pgm AS pgm_name, COUNT(DISTINCT called_key) AS out_degree
+        FROM v_call_edges GROUP BY caller_key, caller_lib, caller_pgm
+    """, db)
+    df_in = read("""
+        SELECT called_key AS pgm_key, called_lib AS pgm_lib,
+               called_pgm AS pgm_name, COUNT(DISTINCT caller_key) AS in_degree
+        FROM v_call_edges GROUP BY called_key, called_lib, called_pgm
+    """, db)
+    df = df_out.merge(df_in, on=["pgm_key","pgm_lib","pgm_name"], how="outer").fillna(0)
+    df["in_degree"]    = df["in_degree"].astype(int)
+    df["out_degree"]   = df["out_degree"].astype(int)
+    df["total_degree"] = df["in_degree"] + df["out_degree"]
+    df = df.sort_values("total_degree", ascending=False)
+    write(df, "call_degrees", db)
+    return df
+
+
+def analyse_dead_code(db):
+    log.info("Dead-Code-Kandidaten ...")
+    df = read("""
+        SELECT o.pgm_lib, o.pgm_name, o.pgm_attribute, o.pgm_text,
+               o.created_at, o.last_used_at,
+               COALESCE(s.days_used_count,0) AS days_used,
+               s.last_used_timestamp
+        FROM dspobjd_clean o
+        LEFT JOIN sysprogramstat s ON o.pgm_name=s.program_name
+                                   AND o.pgm_lib=s.program_schema
+        WHERE COALESCE(s.days_used_count,0) = 0
+        ORDER BY o.pgm_lib, o.pgm_name
+    """, db)
+    write(df, "dead_code_candidates", db)
+    log.info(f"  {len(df):,} Kandidaten")
+    return df
+
+
+def analyse_write_heavy(db):
+    log.info("Write-Heavy-Programme ...")
+    df = read("""
+        SELECT pgm_lib, pgm_name, pgm_key, pgm_attribute,
+               tables_written, tables_read,
+               CASE WHEN (tables_written+tables_read)>0
+                    THEN ROUND(tables_written*100.0/(tables_written+tables_read),1)
+                    ELSE 0 END AS write_ratio_pct,
+               days_used_count AS days_used
+        FROM v_pgm_profile WHERE tables_written > 0
+        ORDER BY write_ratio_pct DESC, tables_written DESC
+    """, db)
+    write(df, "write_heavy_pgms", db)
+    return df
+
+
+def analyse_trigger_impact(db):
+    log.info("Trigger-Impact ...")
+    try:
+        df = read("""
+            SELECT t.table_lib, t.table_name,
+                   t.trigger_name, t.event_manipulation, t.action_timing,
+                   t.pgm_lib AS trigger_pgm_lib,
+                   t.pgm_name AS trigger_pgm_name,
+                   tp.pgm_count AS direct_pgm_access,
+                   tp.writer_count AS direct_writers
+            FROM v_trigger_overview t
+            LEFT JOIN v_table_profile tp ON t.table_name=tp.table_name
+                                         AND t.table_lib=tp.table_lib
+            ORDER BY t.table_lib, t.table_name
+        """, db)
+        write(df, "trigger_impact", db)
+    except Exception as e:
+        log.warning(f"trigger_impact: {e}")
+        df = pd.DataFrame()
+    return df
+
+
+def analyse_rw_matrix(db, top_n_pgm=30, top_n_tbl=30):
+    log.info(f"RW-Matrix (Top {top_n_pgm}×{top_n_tbl}) ...")
+    try:
+        top_pgms = read(
+            f"SELECT pgm_key FROM pgm_importance ORDER BY score DESC LIMIT {top_n_pgm}", db
+        )["pgm_key"].tolist()
+        top_tbls = read(
+            f"SELECT table_key FROM table_importance ORDER BY score DESC LIMIT {top_n_tbl}", db
+        )["table_key"].tolist()
+    except Exception as e:
+        log.warning(f"RW-Matrix Scores fehlen: {e}")
+        return pd.DataFrame()
+
+    if not top_pgms or not top_tbls:
+        return pd.DataFrame()
+
+    df_acc = read("SELECT pgm_key, table_key, is_read, is_write FROM v_data_access", db)
+    df_acc = df_acc[df_acc["pgm_key"].isin(top_pgms) & df_acc["table_key"].isin(top_tbls)]
+
+    agg = df_acc.groupby(["pgm_key","table_key"]).agg(
+        has_read=("is_read","max"), has_write=("is_write","max")
+    ).reset_index()
+
+    def rw_label(r):
+        if r["has_read"] and r["has_write"]: return "RW"
+        if r["has_write"]: return "W"
+        if r["has_read"]:  return "R"
+        return ""
+    agg["access"] = agg.apply(rw_label, axis=1)
+
+    matrix = agg.pivot(index="pgm_key", columns="table_key", values="access").fillna("")
+    matrix = matrix.reindex(
+        index=[p for p in top_pgms if p in matrix.index],
+        columns=[t for t in top_tbls if t in matrix.columns]
+    )
+    write(matrix.reset_index(), "rw_matrix", db)
+
+    num_map = {"":0, "R":1, "W":2, "RW":3}
+    matrix_num = matrix.map(lambda x: num_map.get(x, 0))
+    write(matrix_num.reset_index(), "rw_matrix_numeric", db)
+    return matrix
+
+
+def main():
+    log.info("nb_02_analyse.py – Start")
+    if not SQLITE_DB.exists():
+        log.error(f"SQLite nicht gefunden: {SQLITE_DB}")
+        return
+
+    with sqlite3.connect(SQLITE_DB) as db:
+        df_pgm   = analyse_programme(db)
+        df_tbl   = analyse_tabellen(db)
+        _        = analyse_sprachen(db)
+        _        = analyse_libraries(db)
+        _        = analyse_call_degrees(db)
+        df_dead  = analyse_dead_code(db)
+        df_write = analyse_write_heavy(db)
+        _        = analyse_trigger_impact(db)
+        _        = analyse_rw_matrix(db)
+        db.commit()
+
+    print("\n" + "="*65)
+    print("ANALYSE-ZUSAMMENFASSUNG")
+    print("="*65)
+    if not df_pgm.empty:
+        print(f"\n  Programme gesamt: {len(df_pgm):,}")
+        for cat, n in df_pgm["category"].value_counts().items():
+            print(f"    {cat:<10} {n:>6,}")
+    if not df_tbl.empty:
+        print(f"\n  Tabellen gesamt: {len(df_tbl):,}")
+        for cat, n in df_tbl["category"].value_counts().items():
+            print(f"    {cat:<10} {n:>6,}")
+    if not df_dead.empty:
+        print(f"\n  Dead-Code-Kandidaten: {len(df_dead):,}")
+    if not df_write.empty:
+        print(f"  Programme ≥80% Schreiben: {len(df_write[df_write['write_ratio_pct']>=80]):,}")
+    print("\n  Top 5 Programme:")
+    if not df_pgm.empty:
+        print(df_pgm[["pgm_lib","pgm_name","score","category"]].head(5).to_string(index=False))
+    print("\n  Top 5 Tabellen:")
+    if not df_tbl.empty:
+        print(df_tbl[["table_lib","table_name","score","category"]].head(5).to_string(index=False))
+    print("="*65)
+    log.info("✓ nb_02_analyse.py abgeschlossen")
+
+
+if __name__ == "__main__":
+    main()
