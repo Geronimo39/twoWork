@@ -1,0 +1,67 @@
+def chart_07_call_graph(db):
+    """Call-Graph mit matplotlib + networkx – vollständig offline."""
+    log.info("Chart 07: Call-Graph (networkx/matplotlib)")
+    if not NX_AVAILABLE:
+        log.warning("  networkx fehlt – übersprungen")
+        return
+
+    df_edges = load("""
+        SELECT caller_pgm, called_pgm
+        FROM v_call_edges LIMIT 300
+    """, db)
+    df_scores = load("""
+        SELECT pgm_name, score, category
+        FROM pgm_importance
+    """, db)
+    if df_edges.empty:
+        return
+
+    G = nx.DiGraph()
+    for _, row in df_edges.iterrows():
+        G.add_edge(row["caller_pgm"], row["called_pgm"])
+
+    # Nur die Top-Knoten nach Degree zeigen – sonst unleserlich
+    top_nodes = sorted(G.nodes(),
+                       key=lambda n: G.in_degree(n) + G.out_degree(n),
+                       reverse=True)[:60]
+    G = G.subgraph(top_nodes)
+
+    score_map = dict(zip(df_scores["pgm_name"], df_scores["score"]))
+    cat_map   = dict(zip(df_scores["pgm_name"], df_scores["category"]))
+    color_map = {"HIGH":"#c0392b","MEDIUM":"#e67e22",
+                 "LOW":"#3498db","UNUSED":"#95a5a6"}
+
+    node_colors = [color_map.get(cat_map.get(n,"LOW"),"#3498db")
+                   for n in G.nodes()]
+    node_sizes  = [max(300, min(2000, score_map.get(n,0)*20))
+                   for n in G.nodes()]
+
+    fig, ax = plt.subplots(figsize=(16, 12))
+    fig.patch.set_facecolor("#1a1a2e")
+    ax.set_facecolor("#1a1a2e")
+
+    pos = nx.spring_layout(G, k=2, seed=42)
+    nx.draw_networkx_edges(G, pos, ax=ax,
+                           edge_color="#444444",
+                           arrows=True, arrowsize=10,
+                           width=0.5, alpha=0.6)
+    nx.draw_networkx_nodes(G, pos, ax=ax,
+                           node_color=node_colors,
+                           node_size=node_sizes,
+                           alpha=0.9)
+    nx.draw_networkx_labels(G, pos, ax=ax,
+                            font_size=6,
+                            font_color="white")
+
+    # Legende
+    for cat, col in color_map.items():
+        ax.scatter([], [], c=col, label=cat, s=80)
+    ax.legend(loc="upper left", facecolor="#2c3e50",
+              labelcolor="white", fontsize=9)
+
+    ax.set_title("Call-Graph – Top 60 Programme nach Degree",
+                 fontsize=13, fontweight="bold",
+                 color="white", pad=15)
+    ax.axis("off")
+    plt.tight_layout()
+    save(fig, "07_call_graph")
