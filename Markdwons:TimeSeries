@@ -1,0 +1,208 @@
+## 1) Ziel der Zeitreihenanalyse
+
+Im Unterschied zu einer rein punktuellen Wochenbetrachtung untersucht die Zeitreihenanalyse die Entwicklung vertrieblicher Kennzahlen über einen längeren Zeitraum hinweg. Dadurch werden nicht nur einzelne Ausschläge sichtbar, sondern auch strukturelle Trends, wiederkehrende Muster, Phasen erhöhter Volatilität sowie mögliche Frühwarnsignale.
+
+Im vorliegenden Kontext dienen die Zeitreihenanalysen insbesondere dazu, die Entwicklung der Absatz- bzw. Bestandskennzahlen über die Wochen hinweg systematisch zu beobachten. Dadurch kann bewertet werden, ob Veränderungen eher kurzfristige Schwankungen darstellen oder auf längerfristige Entwicklungen hinweisen.
+
+Methodisch verbindet die Analyse dabei deskriptive, explorative und leicht prognostische Elemente. Im Vordergrund steht weniger die Schätzung komplexer Modelle als vielmehr die Gewinnung eines belastbaren, managementtauglichen Verständnisses der zeitlichen Dynamik.
+
+---
+
+## 2) Datenbasis und Analysegrundlage
+
+Die Analysen basieren auf wöchentlich vorliegenden Vertriebsdaten. Jede Beobachtung repräsentiert eine zeitlich definierte Ausprägung einer Kennzahl, die entweder auf Gesamtportfolio-Ebene, auf Ebene einzelner Produktgruppen oder auf Ebene einzelner Vermittler betrachtet werden kann.
+
+Für die Zeitreihenanalyse ist entscheidend, dass die Daten in eine zeitlich geordnete Struktur überführt werden. Dies geschieht durch den Aufbau einer Panel-Struktur, in der jede Kombination aus Woche, Beobachtungseinheit und Kennzahl eindeutig identifizierbar ist. Eine solche Struktur bildet die Voraussetzung für die Berechnung von Veränderungen zur Vorwoche, rollierenden Kennzahlen, saisonalen Mustern und Prognosen.
+
+Die zugrunde liegende Logik ist damit nicht nur technisch, sondern auch fachlich relevant: Erst durch die konsistente zeitliche Ordnung wird aus einer Sammlung wöchentlicher Einzelstände eine interpretierbare Zeitreihe.
+
+---
+
+## 3) Gesamttrendanalyse
+
+Die Gesamttrendanalyse dient dazu, die Entwicklung des aggregierten Absatzes im Zeitverlauf sichtbar zu machen. Hierzu werden die relevanten Kennzahlen je Woche aufsummiert und in ihrer zeitlichen Abfolge betrachtet.
+
+Statistisch handelt es sich zunächst um eine rein deskriptive Form der Zeitreihenanalyse. Ihr Erkenntniswert liegt jedoch darin, dass sie längerfristige Entwicklungsrichtungen sichtbar macht, die in isolierten Wochenvergleichen leicht übersehen werden könnten. So lassen sich beispielsweise Phasen kontinuierlichen Wachstums, rückläufige Entwicklungen oder abrupte Strukturbrüche erkennen.
+
+Inhaltlich beantwortet diese Sicht vor allem die Frage, wie sich das Gesamtportfolio bzw. die betrachtete Einheit im Zeitverlauf entwickelt und ob sich hierbei ein stabiler, steigender oder rückläufiger Verlauf zeigt.
+
+---
+
+## 4) Entwicklung nach Produktgruppen
+
+Während die Gesamttrendanalyse das Portfolio in aggregierter Form betrachtet, untersucht die produktgruppenbezogene Zeitreihenanalyse die Entwicklung einzelner fachlicher Teilbereiche. Dadurch kann geprüft werden, ob sich alle Produktgruppen ähnlich entwickeln oder ob sich Unterschiede in Dynamik, Niveau und Stabilität zeigen.
+
+Der analytische Mehrwert dieser Differenzierung besteht darin, dass Veränderungen im Gesamtverlauf auf ihre inneren Treiber zurückgeführt werden können. Ein stabiles Gesamtbild kann beispielsweise durch gegenläufige Entwicklungen einzelner Produktgruppen überlagert sein, die erst auf disaggregierter Ebene sichtbar werden.
+
+Diese Analyse ist daher besonders geeignet, um strukturelle Schwerpunktverschiebungen innerhalb des Portfolios frühzeitig zu erkennen.
+
+---
+
+## 5) Delta-Analyse zur Vorwoche
+
+Die Delta-Analyse betrachtet nicht primär das Niveau einer Kennzahl, sondern deren Veränderung gegenüber der unmittelbar vorangehenden Woche. Formal entspricht dies der ersten Differenz einer Zeitreihe.
+
+Der Vorteil dieser Sicht liegt darin, dass kurzfristige Bewegungen und abrupte Richtungswechsel unmittelbar sichtbar werden. Während ein Niveauchart vor allem die Größenordnung zeigt, macht die Delta-Betrachtung deutlich, wann und in welchem Ausmaß Zuwächse oder Rückgänge auftreten.
+
+Im vertrieblichen Kontext ist diese Perspektive besonders wertvoll, weil sie frühe Hinweise auf Beschleunigungen, Einbrüche oder instabile Phasen liefert. Sie ergänzt damit die Niveauanalyse um eine bewegungsorientierte Sicht.
+
+---
+
+## 6) Rollierende Mittelwerte
+
+Zeitreihen auf Wochenbasis sind häufig durch kurzfristige Schwankungen geprägt. Um den zugrunde liegenden Verlauf besser sichtbar zu machen, werden rollierende Mittelwerte verwendet. Dabei wird für jede Woche der Durchschnitt über ein festgelegtes zurückliegendes Zeitfenster berechnet.
+
+Methodisch handelt es sich um ein Glättungsverfahren. Ziel ist es nicht, Informationen zu entfernen, sondern kurzfristiges Rauschen zu reduzieren, damit der mittelfristige Trend klarer erkennbar wird.
+
+Für das Reporting ist diese Darstellung besonders nützlich, weil sie die Interpretation erleichtert: Ein geglätteter Verlauf zeigt klarer, ob eine Produktgruppe oder Sparte strukturell wächst, stagniert oder an Dynamik verliert.
+
+---
+
+## 7) Volatilitätsanalyse
+
+Neben dem Niveau und dem Trend ist auch die Stabilität einer Zeitreihe von Interesse. Diese wird hier über eine rollierende Standardabweichung angenähert. Dazu wird innerhalb eines gleitenden Fensters berechnet, wie stark die Beobachtungen um ihren Mittelwert schwanken.
+
+Eine hohe rollierende Standardabweichung weist auf eine unruhige, volatile Entwicklung hin, während niedrige Werte eher für einen stabilen Verlauf sprechen. Im vertrieblichen Kontext kann dies ein wichtiger Hinweis auf Planbarkeit, Prognosefähigkeit und operative Steuerbarkeit sein.
+
+Die Volatilitätsanalyse ergänzt die Trendaussage damit um eine Risikoperspektive: Nicht nur die Richtung einer Entwicklung ist relevant, sondern auch die Frage, wie verlässlich bzw. schwankungsarm sie verläuft.
+
+---
+
+## 8) Analyse auf Vermittlerebene
+
+Die Betrachtung auf Vermittlerebene dient dazu, die aggregierten Entwicklungen auf ihre individuellen Träger zurückzuführen. Hierbei wird untersucht, welche Vermittler in bestimmten Wochen oder über längere Zeiträume besonders starke positive oder negative Beiträge leisten.
+
+Methodisch handelt es sich um eine disaggregierte Verlaufsanalyse innerhalb der übergeordneten Zeitreihenlogik. Der Nutzen liegt vor allem darin, strukturelle Konzentrationen sichtbar zu machen: So kann geprüft werden, ob Entwicklungen breit getragen sind oder von wenigen besonders starken Vermittlern abhängen.
+
+Diese Sicht ist für die operative Vertriebssteuerung besonders hilfreich, da sie Gesamtbewegungen in konkrete Handlungseinheiten übersetzt.
+
+---
+
+## 9) Top- und Flop-Mover
+
+Die Top-/Flop-Analyse identifiziert diejenigen Einheiten, die in einer betrachteten Woche oder Periode die stärksten positiven bzw. negativen Veränderungen aufweisen. Grundlage ist in der Regel die Veränderung zur Vorwoche oder zu einem anderen Referenzzeitpunkt.
+
+Inhaltlich hilft diese Auswertung dabei, Entwicklungstreiber und Belastungsfaktoren schnell zu lokalisieren. Sie ist insbesondere dann nützlich, wenn Auffälligkeiten aus der aggregierten Zeitreihenanalyse gezielt auf verantwortliche oder beteiligte Einheiten zurückgeführt werden sollen.
+
+Damit verbindet die Analyse die zeitliche Perspektive mit einer priorisierenden operativen Sicht.
+
+---
+
+## 10) Heatmap-Analyse
+
+Die Heatmap dient der kompakten Visualisierung vieler Einzelverläufe über die Zeit. Typischerweise werden dabei die Beobachtungseinheiten, etwa Vermittler, in den Zeilen und die Wochen in den Spalten dargestellt. Die Farbintensität gibt das Ausmaß der jeweiligen Kennzahl wieder.
+
+Der große Vorteil dieser Darstellungsform liegt darin, dass sowohl horizontale als auch vertikale Muster erkennbar werden. Horizontale Strukturen verweisen auf stabile oder volatile Verläufe einzelner Einheiten, vertikale Strukturen auf systemweite starke oder schwache Wochen.
+
+Heatmaps eignen sich daher besonders gut, um komplexe Zeitreihenlandschaften explorativ zu verdichten und wiederkehrende Muster oder Auffälligkeiten rasch sichtbar zu machen.
+
+---
+
+## 11) Saisonale Muster
+
+Zeitreihen können Muster enthalten, die sich in regelmäßigen Abständen wiederholen. Solche wiederkehrenden Strukturen werden als Saisonalität bezeichnet. Im vorliegenden Kontext können beispielsweise bestimmte Kalenderphasen, Monatslagen oder Wochen des Jahres mit systematisch höheren oder niedrigeren Werten verbunden sein.
+
+Die Analyse saisonaler Muster erfolgt hier in vereinfachter Form über Durchschnittswerte nach Monat oder Kalenderwoche. Dadurch wird sichtbar, ob bestimmte Zeitabschnitte im Mittel stärker oder schwächer ausfallen als andere.
+
+Diese Sichtweise ist insbesondere für die vertriebliche Einordnung hilfreich, da sie zwischen einmaligen Ausschlägen und wiederkehrenden zyklischen Mustern unterscheiden hilft.
+
+---
+
+## 12) STL-Zerlegung
+
+Die STL-Zerlegung (Seasonal and Trend decomposition using Loess) trennt eine Zeitreihe in drei Komponenten:
+
+1. eine Trendkomponente,
+2. eine saisonale Komponente,
+3. eine Restkomponente.
+
+Dadurch kann besser beurteilt werden, welcher Anteil des beobachteten Verlaufs auf längerfristige Entwicklungen, welcher auf wiederkehrende Muster und welcher auf nicht systematisch erklärbare Schwankungen zurückzuführen ist.
+
+Für die Interpretation ist dies besonders hilfreich, weil sichtbare Ausschläge dadurch differenzierter eingeordnet werden können. So lässt sich beispielsweise feststellen, ob ein Anstieg eher Teil eines strukturellen Trends, Ausdruck einer saisonalen Bewegung oder lediglich ein einmaliger Sondereffekt ist.
+
+---
+
+## 13) Einfache Prognose
+
+Ergänzend zur rückblickenden Analyse wird eine einfache Kurzfristprognose erstellt. Ziel ist nicht die kausale Erklärung der Entwicklung, sondern eine plausible Fortschreibung des bisherigen Verlaufs in die nahe Zukunft.
+
+Hierzu werden bewusst pragmatische Zeitreihenverfahren verwendet, die vor allem jüngere Beobachtungen stärker gewichten und sich für operative Kurzfristprognosen eignen. Solche Modelle liefern keine sicheren Vorhersagen, können jedoch als Orientierungsgröße für die nächsten Wochen dienen.
+
+Die Prognose ist daher als unterstützendes Instrument der Planung zu verstehen, nicht als deterministische Aussage über die künftige Entwicklung.
+
+---
+
+## 14) Frühwarnindikatoren
+
+Für ein operatives Reporting genügt es häufig nicht, Entwicklungen nur rückblickend zu beschreiben. Ergänzend werden daher einfache Alert-Logiken verwendet, um Wochen mit ungewöhnlichen Bewegungen hervorzuheben.
+
+Solche Auffälligkeiten können beispielsweise vorliegen, wenn:
+- die Veränderung zur Vorwoche außergewöhnlich stark ausfällt,
+- oder der aktuelle Wert deutlich vom jüngeren Durchschnittsverlauf abweicht.
+
+Diese Regeln ersetzen keine vertiefte Analyse, sie leisten jedoch einen wichtigen Beitrag zur Priorisierung. Sie helfen dabei, aus der Vielzahl der Beobachtungen diejenigen Zeitpunkte herauszufiltern, die einer fachlichen Prüfung besonders bedürfen.
+
+---
+
+## 15) Managementorientierte Einordnung
+
+Die Ergebnisse der Zeitreihenanalyse lassen sich in verdichteter Form für ein Management- oder Vorstandsreporting zusammenfassen. Dabei stehen vor allem drei Perspektiven im Vordergrund:
+
+1. **Niveau:** Welche Produktgruppen oder Sparten tragen aktuell das höchste Volumen?
+2. **Dynamik:** Wo zeigen sich die stärksten positiven oder negativen Veränderungen?
+3. **Stabilität:** Welche Bereiche entwickeln sich planbar, welche auffällig volatil?
+
+Der Mehrwert dieser kompakten Zusammenführung besteht darin, dass aus einer Vielzahl analytischer Einzelsichten eine steuerungsrelevante Gesamteinschätzung abgeleitet werden kann.
+
+---
+
+## 16) Grenzen der Analyse
+
+Trotz ihres hohen Nutzens bleibt die vorliegende Zeitreihenanalyse in erster Linie explorativ und deskriptiv. Sie zeigt, **wie** sich Kennzahlen über die Zeit entwickeln, beantwortet jedoch nicht automatisch, **warum** dies geschieht.
+
+Für eine tiefergehende Ursachenanalyse wären zusätzliche Informationen erforderlich, etwa:
+- Kampagnen- oder Maßnahmeninformationen,
+- Kalender- und Feiertagseffekte,
+- organisatorische Veränderungen,
+- Produktanpassungen,
+- oder weitere Stammdaten der Vermittler.
+
+Die Ergebnisse sollten daher als fundierte Beobachtungs- und Bewertungsgrundlage verstanden werden, nicht als abschließende kausale Erklärung.
+
+---
+
+## 17) Zwischenfazit
+
+Die Zeitreihenanalysen erweitern die bisherige punktuelle Wochenbetrachtung um eine historische und dynamische Perspektive. Dadurch wird sichtbar, ob beobachtete Bewegungen lediglich kurzfristige Schwankungen darstellen oder Ausdruck struktureller Entwicklungen sind.
+
+Besonders wertvoll ist dabei das Zusammenspiel mehrerer Analyseebenen: Aggregierte Trends liefern die Gesamtsicht, Delta- und Volatilitätsanalysen zeigen Bewegungs- und Stabilitätsmuster, während vermittler- und produktgruppenbezogene Auswertungen die identifizierten Entwicklungen konkret verorten.
+
+Damit entsteht eine belastbare Grundlage für ein datenbasiertes Vertriebsmonitoring, das sowohl operative Auffälligkeiten als auch strategische Entwicklungen sichtbar machen kann.
+
+---
+
+## 18) Generische Kurzinterpretationen für Ergebnisabschnitte
+
+### 18.1) Nach einem Linienchart
+
+Die Visualisierung zeigt den zeitlichen Verlauf der betrachteten Kennzahlen über den Analysezeitraum. Erkennbar werden dabei sowohl das allgemeine Niveau als auch mögliche Phasen steigender, fallender oder seitwärts gerichteter Entwicklung.
+
+Besondere Aufmerksamkeit verdienen Wochen mit abrupten Ausschlägen sowie längerfristige Veränderungen im Trendverlauf, da diese auf strukturelle Verschiebungen oder operative Sondereffekte hindeuten können.
+
+### 18.2) Nach einem Delta-Chart
+
+Die dargestellten Deltas verdeutlichen die Veränderung zur Vorwoche und machen damit die kurzfristige Dynamik der Zeitreihe sichtbar. Positive Ausschläge stehen für Zuwächse, negative Ausschläge für Rückgänge.
+
+Eine Häufung starker Richtungswechsel spricht für eine volatilere Entwicklung, während moderate und gleichmäßige Veränderungen eher auf einen stabileren Verlauf hindeuten.
+
+### 18.3) Nach einer Heatmap
+
+Die Heatmap verdichtet eine große Zahl einzelner Zeitreihen in einer gemeinsamen Darstellung. Dadurch werden sowohl vermittlerspezifische Muster als auch systemweite starke oder schwache Wochen sichtbar.
+
+Besonders relevant sind dabei wiederkehrende Muster, auffällige Konzentrationen sowie einzelne Einheiten mit deutlich abweichendem Verhalten.
+
+### 18.4) Nach Forecasts
+
+Die Prognose stellt eine modellbasierte Fortschreibung des bisherigen Verlaufs dar. Sie dient in erster Linie als operative Orientierung für die nahe Zukunft und nicht als sichere Vorhersage.
+
+Abweichungen zwischen Prognose und tatsächlicher Entwicklung können ihrerseits wieder analytisch interessant sein, da sie auf neu eingetretene Einflüsse oder veränderte Dynamiken hinweisen.
