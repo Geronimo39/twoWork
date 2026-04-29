@@ -1,0 +1,458 @@
+================================================================================
+PROJEKT dispDB — EINSTELLUNGSGESPRÄCH DATA ANALYST / DATA SCIENTIST
+Fragenkatalog inkl. Hinweise zu guten Antworten
+Stand: April 2026
+================================================================================
+
+
+================================================================================
+TEIL 1 — FRAGEN, DIE ICH DEN BEWERBERN STELLE
+================================================================================
+
+------------------------------------------------------------------------
+BLOCK 1 — TECHNISCH (SQL, Python, Spark, Databricks, Power BI)
+------------------------------------------------------------------------
+
+FRAGE 1:
+"Beschreiben Sie bitte eine Datenpipeline, die Sie selbst entwickelt haben —
+von der Quelldatenerfassung bis zur Bereitstellung. Welche Technologien haben
+Sie eingesetzt und welche Herausforderungen sind aufgetreten?"
+
+Worauf ich achte:
+Kann die Person eine Pipeline end-to-end beschreiben? Kennt sie die typischen
+Stolperstellen (Datenqualität, Fehlerbehandlung, Performance)? Verwendet sie
+die richtigen Begriffe ohne Übertreibung?
+
+Gute Antwort:
+Konkrete Technologien, konkretes Problem, konkreter Lösungsweg — kein
+allgemeines Buzzword-Bingo.
+
+Warnsignal:
+Sehr vage Beschreibung, keine konkreten Technologien, "haben wir im Team
+gemacht" ohne eigenen Anteil.
+
+------------------------------------------------------------------------
+
+FRAGE 2:
+"Wie würden Sie in Python eine große Tabelle aus einer relationalen Datenbank
+effizient in ein Lakehouse laden — und was würden Sie dabei in Bezug auf
+Datenqualität prüfen?"
+
+Worauf ich achte:
+Kennt die Person Konzepte wie chunked loading, Parallelisierung,
+Schema-Validierung? Denkt sie an Fehlerbehandlung und Logging?
+
+Gute Antwort:
+Erwähnung von pandas/pyodbc oder SQLAlchemy für kleinere Mengen, PySpark für
+größere; Schema-Check, Null-Handling, Duplikat-Erkennung; Logging der
+Laufschritte.
+
+Warnsignal:
+"Einfach pd.read_sql() und fertig" ohne jede Qualitätsprüfung.
+
+------------------------------------------------------------------------
+
+FRAGE 3:
+"Haben Sie bereits mit Apache Spark gearbeitet — und wenn ja, in welchem
+Kontext? Was ist aus Ihrer Sicht der größte konzeptionelle Unterschied
+zwischen pandas und PySpark?"
+
+Worauf ich achte:
+Versteht die Person das Grundprinzip (verteilte Verarbeitung, lazy evaluation,
+DAGs)? Weiß sie, wann Spark sinnvoll ist und wann nicht?
+
+Gute Antwort:
+Spark für große, verteilte Datenmengen; pandas für kleine, lokale Operationen;
+lazy evaluation als Kernprinzip; Erwähnung von DataFrames und ggf. Catalyst
+Optimizer.
+
+Warnsignal:
+"Spark ist wie pandas, nur schneller" — das zeigt fehlendes konzeptionelles
+Verständnis.
+
+------------------------------------------------------------------------
+
+FRAGE 4:
+"Wie haben Sie in Power BI bisher die Verbindung zwischen Datenmodell und
+Report gestaltet? Haben Sie mit Semantic Models oder DirectQuery gearbeitet?"
+
+Worauf ich achte:
+Kennt die Person den Unterschied zwischen Import Mode, DirectQuery und
+Composite Model? Versteht sie das Konzept eines Semantic Models als
+Zwischenschicht?
+
+Gute Antwort:
+Bewusste Entscheidung für Import vs. DirectQuery je nach Use Case; Erfahrung
+mit DAX-Measures; Verständnis für die Rolle des Semantic Models als
+wiederverwendbare Schicht.
+
+Warnsignal:
+"Ich habe einfach die Tabellen direkt verbunden" ohne Kenntnis von
+Modellierungskonzepten.
+
+------------------------------------------------------------------------
+
+FRAGE 5:
+"Was verstehen Sie unter Versionskontrolle im Kontext von Datenpipelines —
+und wie haben Sie das in der Praxis umgesetzt?"
+
+Worauf ich achte:
+Kennt die Person Git-Grundkonzepte (Branching, Commits, Pull Requests)? Hat
+sie Git auch für Notebooks / Pipeline-Code verwendet?
+
+Gute Antwort:
+Feature Branches für neue Entwicklungen, Code Reviews via Pull Requests, ggf.
+Anbindung von Databricks Notebooks an ein Git-Repository.
+
+Warnsignal:
+"Ich habe Dateien mit Datum im Namen gespeichert" — das ist kein Ersatz für
+Versionskontrolle.
+
+------------------------------------------------------------------------
+BLOCK 2 — FACHLICH-KONZEPTIONELL (Architektur, Datenmodellierung, Compliance)
+------------------------------------------------------------------------
+
+FRAGE 6:
+"Kennen Sie die Medallion-Architektur (Bronze / Silver / Gold)? Erklären Sie
+bitte, was auf jeder Ebene passiert und welche Transformationen Sie dort
+typischerweise erwarten würden."
+
+Worauf ich achte:
+Versteht die Person das Konzept wirklich — oder hat sie nur den Begriff
+gelesen?
+
+Gute Antwort:
+Bronze = Rohdaten as-is aus Quellsystemen; Silver = bereinigte,
+standardisierte, angereicherte Daten; Gold = aggregierte, fachlich modellierte
+Daten für Reporting und Analytics. Dazu konkrete Beispiele für
+Transformationen auf jeder Ebene.
+
+Warnsignal:
+Vage Umschreibung ohne konkreten Inhalt der einzelnen Schichten.
+
+------------------------------------------------------------------------
+
+FRAGE 7:
+"Was verstehen Sie unter Data Lineage — und warum ist das in einem regulierten
+Umfeld wie der Versicherungsbranche besonders relevant?"
+
+Worauf ich achte:
+Versteht die Person den Zusammenhang zwischen Nachvollziehbarkeit,
+Auditierbarkeit und regulatorischen Anforderungen (DORA, BaFin)?
+
+Gute Antwort:
+Data Lineage = lückenlose Nachverfolgbarkeit jedes Datenpunkts von der Quelle
+bis zum Report; relevant für Audits, regulatorische Prüfungen, Fehleranalyse;
+Unity Catalog als Werkzeug zur Umsetzung.
+
+Warnsignal:
+"Data Lineage kenne ich nur als Begriff" — bei Mid-Level nicht akzeptabel.
+
+------------------------------------------------------------------------
+
+FRAGE 8:
+"Haben Sie bereits in einem Umfeld mit regulatorischen Datenanforderungen
+gearbeitet — z. B. BaFin, DORA, DSGVO oder vergleichbar? Was hat das konkret
+für Ihre tägliche Arbeit bedeutet?"
+
+Worauf ich achte:
+Hat die Person echte Praxiserfahrung mit Compliance-Anforderungen — oder nur
+theoretisches Wissen?
+
+Gute Antwort:
+Konkrete Beispiele wie Datenzugriffsprotokolle, Löschkonzepte,
+Dokumentationspflichten, Audit Trails — nicht nur "ich kenne DSGVO".
+
+Warnsignal:
+Rein theoretische Antwort ohne praktischen Bezug.
+
+------------------------------------------------------------------------
+BLOCK 3 — SOFT SKILLS & ARBEITSWEISE
+------------------------------------------------------------------------
+
+FRAGE 9:
+"Stellen Sie sich vor, eine Fachabteilung kommt zu Ihnen mit der Anforderung:
+'Wir brauchen einen Report, der zeigt, wie es uns geht.' Wie gehen Sie vor?"
+
+Worauf ich achte:
+Geht die Person strukturiert in die Anforderungsaufnahme? Fragt sie nach KPIs,
+Zielgruppe, Aktualisierungsfrequenz, Datenquellen? Oder fängt sie sofort an
+zu bauen?
+
+Gute Antwort:
+Erst Fragen stellen — was genau soll gemessen werden, wer schaut sich den
+Report an, wie oft, welche Entscheidungen sollen damit getroffen werden —
+dann Konzept abstimmen, dann umsetzen.
+
+Warnsignal:
+"Ich würde erstmal einen Dashboard-Entwurf machen" ohne vorherige
+Anforderungsklärung.
+
+------------------------------------------------------------------------
+
+FRAGE 10:
+"Beschreiben Sie eine Situation, in der Sie mit einer Fachabteilung
+zusammengearbeitet haben, die fachlich sehr wenig Datenkompetenz hatte.
+Wie haben Sie kommuniziert und was haben Sie dabei gelernt?"
+
+Worauf ich achte:
+Kann die Person auf Augenhöhe mit Nicht-Technikern kommunizieren? Zeigt sie
+Empathie und Geduld — oder Frustration?
+
+Gute Antwort:
+Konkretes Beispiel, bewusste Vereinfachung ohne Herablassung, iterativer
+Abstimmungsprozess, Lernerfahrung aus der Situation.
+
+Warnsignal:
+"Die Fachabteilung hat einfach nicht verstanden, was ich erklärt habe" —
+das ist keine Reflexion, das ist Schuldzuweisung.
+
+------------------------------------------------------------------------
+
+FRAGE 11:
+"Unsere Plattform wird sich in den nächsten Jahren erheblich weiterentwickeln
+— von der aktuellen Reporting-Plattform hin zu einer zentralen
+Analytics-Plattform mit ML/KI-Komponenten und externen
+Service-Integrationen. Wie stehen Sie dazu, und wie halten Sie sich technisch
+auf dem Laufenden?"
+
+Worauf ich achte:
+Ist die Person intrinsisch motiviert, sich weiterzuentwickeln? Hat sie
+konkrete Methoden (Kurse, Communities, Projekte), oder bleibt die Antwort
+vage?
+
+Gute Antwort:
+Konkrete Lernformate (z. B. Microsoft Learn, Databricks Academy, Kaggle,
+eigene Projekte), Neugier auf ML/KI, keine Angst vor Veränderung.
+
+Warnsignal:
+"Ich lerne, wenn es nötig ist" ohne eigene Initiative — das ist für eine sich
+schnell entwickelnde Plattform zu passiv.
+
+------------------------------------------------------------------------
+
+ABSCHLUSSFRAGE — immer stellen:
+"Haben Sie Fragen an uns — zur Plattform, zur Rolle oder zur Zusammenarbeit?"
+
+Worauf ich achte:
+Gute Kandidaten haben immer Fragen. Wer keine hat, hat sich entweder nicht
+vorbereitet oder ist nicht wirklich interessiert. Besonders gute Zeichen:
+Fragen zur technischen Tiefe der Plattform, zur Zusammenarbeit mit den
+Fachabteilungen oder zur Entwicklungsperspektive.
+
+------------------------------------------------------------------------
+EMPFEHLUNG ZUR GESPRÄCHSFÜHRUNG:
+Für ein einstündiges Gespräch: je Block 2-3 Fragen auswählen, Abschlussfrage
+immer stellen. So bleibt genug Raum für echte, ausführliche Antworten.
+------------------------------------------------------------------------
+
+
+================================================================================
+TEIL 2 — FRAGEN, DIE AN MICH GERICHTET WERDEN KÖNNTEN
+(inkl. empfohlener Antworten)
+================================================================================
+
+------------------------------------------------------------------------
+BLOCK A — ZUR PLATTFORM & TECHNISCHEN UMGEBUNG
+------------------------------------------------------------------------
+
+FRAGE A1:
+"Auf welchem Stand befindet sich die Plattform aktuell — und was erwartet
+mich in den ersten Wochen?"
+
+Empfohlene Antwort:
+"Die Plattform befindet sich im aktiven Aufbau. Wir arbeiten auf Basis von
+MS Fabric mit Azure Data Lake Storage als zentralem Speicher und Databricks
+für die Transformation. Der Projektstart ist für August 2026 geplant. In den
+ersten Wochen werden Sie die Architektur kennenlernen, an der
+Anforderungserhebung mitwirken und schrittweise in die Pipeline-Entwicklung
+einsteigen. Es ist ein Greenfield-Projekt — das bedeutet Gestaltungsspielraum,
+aber auch die Bereitschaft, in einer noch nicht vollständig etablierten
+Umgebung zu arbeiten."
+
+Warum diese Antwort:
+Sie ist ehrlich, weckt keine falschen Erwartungen und zeigt gleichzeitig den
+Gestaltungsspielraum — das ist für ambitionierte Mid-Level-Kandidaten attraktiv.
+
+------------------------------------------------------------------------
+
+FRAGE A2:
+"Welche Quellsysteme werden angebunden — und wie komplex ist die
+Datenintegration?"
+
+Empfohlene Antwort:
+"Wir arbeiten mit zwei Legacy-Quellsystemen: einem IBM AS/400 und einer
+Oracle-Datenbank. Die Anbindung erfolgt über einen Self-hosted Integration
+Runtime auf einem dedizierten Windows-VM. Die Datenkomplexität ist real —
+heterogene Strukturen, unterschiedliche Datenqualitäten — aber das ist
+genau der Bereich, in dem wir solide Unterstützung suchen."
+
+Warum diese Antwort:
+Zeigt technische Tiefe und Ehrlichkeit über die Komplexität — ohne abzuschrecken.
+
+------------------------------------------------------------------------
+
+FRAGE A3:
+"Gibt es bereits eine Git-Infrastruktur oder andere Entwicklungsstandards?"
+
+Empfohlene Antwort:
+"Eine dedizierte Git-Infrastruktur wird im Rahmen des Projekts noch
+etabliert — wir prüfen aktuell die Nutzung von Azure Repos im Kontext
+unserer Konzerninfrastruktur. Die Einrichtung ist ein früher Schritt im
+Projekt, an dem die neue Person aktiv mitwirken wird. Entwicklungsstandards
+werden wir gemeinsam definieren — das ist eine Mitgestaltungsmöglichkeit,
+keine Einschränkung."
+
+Warum diese Antwort:
+Ehrlich über den aktuellen Stand, aber positiv gerahmt als
+Mitgestaltungsmöglichkeit.
+
+------------------------------------------------------------------------
+BLOCK B — ZUR ROLLE & ZUSAMMENARBEIT
+------------------------------------------------------------------------
+
+FRAGE B1:
+"Wie ist die Rolle gegenüber anderen Positionen im Team abgegrenzt —
+insbesondere in Bezug auf Architektur und Plattformverantwortung?"
+
+Empfohlene Antwort:
+"Die Plattform- und Architekturverantwortung liegt bei mir als
+Projektverantwortlichem. Die neue Rolle konzentriert sich auf den operativen
+Betrieb und die Analytics-Ebene: Pipeline-Entwicklung und -pflege in
+Databricks, Reporting in Power BI, Fachabteilungsbetreuung und
+Dokumentation. Das ist eine klar definierte, eigenverantwortliche Rolle —
+mit echtem Entwicklungspotenzial in Richtung ML/KI, sobald die
+Grundinfrastruktur steht."
+
+Warum diese Antwort:
+Schafft Klarheit über die Rollenabgrenzung, ohne die Stelle kleiner zu reden
+als sie ist.
+
+------------------------------------------------------------------------
+
+FRAGE B2:
+"Wie eng ist die Zusammenarbeit mit den Fachabteilungen — und wer übernimmt
+die Kommunikation dorthin?"
+
+Empfohlene Antwort:
+"Die eigenständige Betreuung der Fachabteilungen ist ein zentraler Bestandteil
+der Rolle. Das bedeutet: Anforderungen selbst aufnehmen, Lösungen abstimmen,
+Ergebnisse präsentieren — ohne dass jede Kommunikation über mich läuft.
+Ich stehe natürlich für fachliche und technische Rückfragen zur Verfügung,
+aber die direkte Schnittstelle zu den Fachbereichen liegt bewusst bei der
+neuen Person."
+
+Warum diese Antwort:
+Macht die Kommunikationserwartung klar und signalisiert Vertrauen in die
+Eigenständigkeit der neuen Person.
+
+------------------------------------------------------------------------
+
+FRAGE B3:
+"Wie groß ist das Team — und mit wem arbeite ich direkt zusammen?"
+
+Empfohlene Antwort:
+"Das Kernteam des Projekts ist bewusst schlank gehalten: ich als
+Projektverantwortlicher und Systemarchitekt, Sie als Data Analyst /
+Data Scientist, sowie punktuell Herr [Name] aus der IT-Infrastruktur für
+Netzwerk- und Datenbankthemen. Zusätzlich arbeiten wir mit dem
+Konzern-Platform-Team zusammen, das die Infrastruktur via Terraform
+bereitstellt. Es ist ein kleines, schlagkräftiges Team — mit kurzen
+Entscheidungswegen."
+
+Warum diese Antwort:
+Realistisches Bild des Teams, kurze Entscheidungswege als Vorteil positioniert.
+
+------------------------------------------------------------------------
+BLOCK C — ZUR ENTWICKLUNGSPERSPEKTIVE
+------------------------------------------------------------------------
+
+FRAGE C1:
+"Welche Entwicklungsmöglichkeiten gibt es in dieser Rolle mittelfristig?"
+
+Empfohlene Antwort:
+"Die Plattform wird sich erheblich weiterentwickeln: Integration externer
+Datenservices und Branchenschnittstellen wie BiPRO, systematischer Einsatz
+von Machine Learning und KI in Databricks, Ausbau zur zentralen
+Analytics-Plattform des Unternehmens. Wer jetzt einsteigt, baut diese
+Entwicklung aktiv mit — das ist keine Verwaltungsrolle, sondern eine
+Gestaltungsrolle. Ich unterstütze gezielte Weiterbildung, z. B. in
+Richtung Databricks-Zertifizierung oder ML-Engineering."
+
+Warum diese Antwort:
+Zeigt eine echte Perspektive auf — ohne unrealistische Versprechen zu machen.
+
+------------------------------------------------------------------------
+
+FRAGE C2:
+"Gibt es Weiterbildungsmöglichkeiten — wird das vom Unternehmen unterstützt?"
+
+Empfohlene Antwort:
+"Ja, Weiterbildung ist ausdrücklich erwünscht und wird unterstützt. Konkret
+planen wir im Rahmen des Projekts bereits Schulungen — sowohl für Power BI
+als auch für MS Fabric und Databricks. Für die neue Rolle sind insbesondere
+Databricks-Zertifizierungen und vertiefende ML/KI-Kurse perspektivisch
+relevant. Details stimmen wir gerne gemeinsam ab."
+
+Warum diese Antwort:
+Konkret genug um glaubwürdig zu sein, offen genug um individuelle Absprachen
+zu ermöglichen.
+
+------------------------------------------------------------------------
+BLOCK D — KRITISCHE / UNANGENEHME FRAGEN
+------------------------------------------------------------------------
+
+FRAGE D1:
+"Sie beschreiben das als Greenfield-Projekt — was passiert, wenn sich
+Zeitpläne verschieben oder die Infrastruktur nicht rechtzeitig steht?"
+
+Empfohlene Antwort:
+"Das ist eine berechtigte Frage. Die Infrastruktur wird durch unser
+Konzern-Platform-Team bereitgestellt — das schafft Abhängigkeiten, die wir
+aktiv managen. Im Projektplan haben wir Puffer eingeplant, und die
+Meilensteinplanung folgt einer realistischen Rückwärtsplanung vom Go-Live.
+Sollte es zu Verzögerungen kommen, priorisieren wir konsequent: lieber
+wenige Dinge wirklich stabil als vieles halbfertig."
+
+Warum diese Antwort:
+Zeigt Realismus und Risikobewusstsein — ohne Unsicherheit zu signalisieren.
+
+------------------------------------------------------------------------
+
+FRAGE D2:
+"Die Stelle klingt sehr breit — von Pipeline-Entwicklung über Reporting bis
+zur Fachabteilungsbetreuung. Ist das nicht zu viel für eine Person?"
+
+Empfohlene Antwort:
+"Das ist eine faire Beobachtung. Die Breite ist bewusst so angelegt, weil
+wir in Phase I einen MVP aufbauen — also eine stabile, robuste Grundlage
+mit 2-3 Containern und ersten Reports. Das ist kein Vollausbau aller
+Funktionen auf einmal. Die Tiefe der einzelnen Themen wächst mit der
+Plattform — und genau dafür suchen wir jemanden, der eigenständig
+priorisieren kann und nicht auf fertige Strukturen angewiesen ist."
+
+Warum diese Antwort:
+Nimmt die Frage ernst, erklärt den MVP-Ansatz verständlich und positioniert
+die Breite als Feature, nicht als Bug.
+
+------------------------------------------------------------------------
+
+FRAGE D3:
+"Warum wird diese Stelle jetzt neu geschaffen — gab es die Position vorher
+nicht?"
+
+Empfohlene Antwort:
+"Die dispositive Datenbank ist ein neu genehmigtes Projekt — es gibt diese
+Plattform in dieser Form im Unternehmen noch nicht. Die Stelle entsteht
+also nicht als Ersatz für jemanden, sondern weil wir für den Aufbau und
+den laufenden Betrieb dedizierte Analytics-Kompetenz brauchen. Das ist
+eine echte Aufbausituation — mit allem, was dazu gehört: Gestaltungsspielraum,
+aber auch die Bereitschaft, in einem noch entstehenden Umfeld zu arbeiten."
+
+Warum diese Antwort:
+Transparent und positiv — keine versteckten Informationen, klare Positionierung
+als Aufbaurolle.
+
+================================================================================
+Ende des Fragenkatalogs | Projekt dispDB | Stand: April 2026
+================================================================================
