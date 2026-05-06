@@ -1,0 +1,563 @@
+"""
+AS/400 Job Deep-Dive: Call-Tree + letzter Spool-File
+=====================================================
+Gibt einen Job-Namen ein → liefert:
+  1. JOBD des Jobs (Initiales Programm, Queue, User, ...)
+  2. Call-Tree via DSPPGMREF (rekursiv, als Baumstruktur)
+  3. Letzten Spool-File-Inhalt des Jobs (via WRKSPLF → Outfile)
+  4. QHST-Einträge für diesen Job (letzte N Tage)
+  5. Excel-Export + Konsolenausgabe
+
+Konfiguration:
+"""
+
+import pyodbc
+import pandas as pd
+from datetime import datetime, timedelta
+from pathlib import Path
+import sys
+
+# ── Konfiguration ────────────────────────────────────────────────────────────
+DSN            = "AS400"          # ODBC-DSN Name
+MY_SCHEMA      = "STEFAN"         # Dein Write-Access Schema
+OUTPUT_DIR     = Path(".")
+
+# ► Hier den Job-Namen eintragen (oder beim Start als Argument übergeben):
+JOB_NAME_INPUT = "MEIN_JOB"       # z.B. "TAGEND_NOP" oder "VRDAT_LOAD"
+
+HQST_DAYS_BACK     = 14           # Wie viele Tage QHST rückwärts analysieren
+MAX_CALL_DEPTH     = 6            # Maximale Rekursionstiefe für Call-Tree
+MAX_SPOOL_LINES    = 500          # Maximale Zeilen aus dem Spool-File anzeigen
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def connect():
+    conn = pyodbc.connect(f"DSN={DSN}", autocommit=True)
+    conn.setdecoding(pyodbc.SQL_CHAR, encoding="cp1252")
+    conn.setdecoding(pyodbc.SQL_WCHAR, encoding="cp1252")
+    conn.setencoding(encoding="cp1252")
+    return conn
+
+
+def run_query(conn, sql, label=""):
+    try:
+        df = pd.read_sql(sql, conn)
+        print(f"  ✓ {label}: {len(df)} Zeilen")
+        return df
+    except Exception as e:
+        print(f"  ✗ {label}: {e}")
+        return pd.DataFrame()
+
+
+def run_cl(conn, cl_command, silent=False):
+    escaped = cl_command.replace("'", "''")
+    length  = len(cl_command)
+    sql = f"CALL QSYS2.QCMDEXC('{escaped}', {length}.00000)"
+    try:
+        conn.execute(sql)
+        return True
+    except Exception as e:
+        if not silent:
+            print(f"    CL-Fehler: {e}")
+        return False
+
+
+def drop_binary_cols(df):
+    bad = [c for c in df.columns if df[c].dtype == object and
+           df[c].dropna().apply(lambda x: isinstance(x, (bytes, bytearray))).any()]
+    return df.drop(columns=bad) if bad else df
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCHRITT 1: Job Description des Jobs finden
+# ══════════════════════════════════════════════════════════════════════════════
+def get_job_description(conn, job_name: str) -> dict:
+    """
+    Sucht die Job Description für den gegebenen Job-Namen.
+    Versucht zuerst SCHEDULED_JOB_INFO, dann JOB_DESCRIPTION_INFO direkt.
+    """
+    print(f"\n{'='*60}")
+    print(f"[1] Job Description für: {job_name}")
+    print(f"{'='*60}")
+
+    result = {
+        "job_name":    job_name,
+        "jobd_name":   None,
+        "jobd_lib":    None,
+        "inl_pgm":     None,
+        "inl_pgm_lib": None,
+        "job_queue":   None,
+        "user":        None,
+        "raw_df":      pd.DataFrame()
+    }
+
+    # Variante A: Job in SCHEDULED_JOB_INFO nachschlagen
+    sql_sched = f"""
+        SELECT *
+        FROM QSYS2.SCHEDULED_JOB_INFO
+        WHERE UPPER(JOB_NAME) LIKE UPPER('%{job_name}%')
+        FETCH FIRST 5 ROWS ONLY
+    """
+    df_sched = run_query(conn, sql_sched, "SCHEDULED_JOB_INFO (Job-Suche)")
+
+    if not df_sched.empty:
+        row = df_sched.iloc[0]
+        result["jobd_name"] = str(row.get("JOB_DESCRIPTION", "")).strip()
+        result["jobd_lib"]  = str(row.get("JOB_DESCRIPTION_LIBRARY", "")).strip()
+        result["job_queue"] = str(row.get("JOB_QUEUE_NAME", "")).strip()
+        result["raw_df"]    = drop_binary_cols(df_sched)
+        print(f"  → JOBD: {result['jobd_lib']}/{result['jobd_name']}")
+
+    # Variante B: JOBD direkt nachschlagen (liefert INLPGM)
+    if result["jobd_name"] and result["jobd_name"] not in ("", "None"):
+        sql_jobd = f"""
+            SELECT *
+            FROM QSYS2.JOB_DESCRIPTION_INFO
+            WHERE UPPER(JOB_DESCRIPTION_NAME) = UPPER('{result["jobd_name"]}')
+              AND UPPER(JOB_DESCRIPTION_LIBRARY) = UPPER('{result["jobd_lib"]}')
+            FETCH FIRST 1 ROWS ONLY
+        """
+        df_jobd = run_query(conn, sql_jobd, "JOB_DESCRIPTION_INFO (INLPGM)")
+        if not df_jobd.empty:
+            df_jobd = drop_binary_cols(df_jobd)
+            row2 = df_jobd.iloc[0]
+            for col in df_jobd.columns:
+                if "INLPGM" in col.upper() or "INITIAL" in col.upper():
+                    result["inl_pgm"]     = str(row2.get(col, "")).strip()
+                if "INLPGMLIB" in col.upper():
+                    result["inl_pgm_lib"] = str(row2.get(col, "")).strip()
+            if result["raw_df"].empty:
+                result["raw_df"] = df_jobd
+            else:
+                result["raw_df"] = pd.concat([result["raw_df"], df_jobd], ignore_index=True)
+
+    # Variante C: Suche in JOB_DESCRIPTION_INFO nach Name-Pattern
+    sql_jobd2 = f"""
+        SELECT *
+        FROM QSYS2.JOB_DESCRIPTION_INFO
+        WHERE UPPER(JOB_DESCRIPTION_NAME) LIKE UPPER('%{job_name}%')
+        FETCH FIRST 10 ROWS ONLY
+    """
+    df_jobd2 = run_query(conn, sql_jobd2, "JOB_DESCRIPTION_INFO (Name-Pattern)")
+    if not df_jobd2.empty:
+        df_jobd2 = drop_binary_cols(df_jobd2)
+        if result["raw_df"].empty:
+            result["raw_df"] = df_jobd2
+        else:
+            result["raw_df"] = pd.concat([result["raw_df"], df_jobd2], ignore_index=True)
+
+    # Konsolenausgabe
+    print(f"\n  Job:        {result['job_name']}")
+    print(f"  JOBD:       {result['jobd_lib']}/{result['jobd_name']}")
+    print(f"  Init.Pgm:   {result['inl_pgm_lib']}/{result['inl_pgm']}")
+    print(f"  Job Queue:  {result['job_queue']}")
+
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCHRITT 2: Call-Tree via DSPPGMREF (rekursiv)
+# ══════════════════════════════════════════════════════════════════════════════
+def get_call_tree(conn, root_pgm: str, root_lib: str, max_depth: int = MAX_CALL_DEPTH) -> pd.DataFrame:
+    """
+    Baut einen Call-Tree rekursiv auf:
+    root_pgm ruft → PGM_A, PGM_B ...
+    PGM_A ruft → PGM_C, PGM_D ...  usw.
+
+    Verwendet DSPPGMREF OUTPUT(*OUTFILE) → STEFAN.PGMREF_OUT
+    """
+    print(f"\n{'='*60}")
+    print(f"[2] Call-Tree für: {root_lib}/{root_pgm} (max. Tiefe {max_depth})")
+    print(f"{'='*60}")
+
+    all_edges   = []   # Liste von (depth, caller_lib, caller, callee_lib, callee, obj_type)
+    visited     = set()
+    queue       = [(root_pgm.strip(), root_lib.strip(), 0)]  # (pgm, lib, depth)
+
+    while queue:
+        pgm, lib, depth = queue.pop(0)
+        key = f"{lib}/{pgm}"
+
+        if key in visited or depth > max_depth:
+            continue
+        visited.add(key)
+
+        # DSPPGMREF für dieses Programm
+        cl = (
+            f"DSPPGMREF PGM({lib}/{pgm}) "
+            f"OUTPUT(*OUTFILE) "
+            f"OUTFILE({MY_SCHEMA}/PGMREF_OUT) "
+            f"OUTMBR(*FIRST *REPLACE)"
+        )
+        ok = run_cl(conn, cl, silent=True)
+        if not ok:
+            continue
+
+        try:
+            df = pd.read_sql(f"SELECT * FROM {MY_SCHEMA}.PGMREF_OUT", conn)
+            df = drop_binary_cols(df)
+        except Exception:
+            continue
+
+        if df.empty:
+            continue
+
+        # Spaltennamen normalisieren (pre-V7 kann variieren)
+        cols = {c.upper(): c for c in df.columns}
+
+        # Felder: WHRECP/WHRELI = referenziertes Objekt + Library
+        #         WHOBJT = Objekttyp (*PGM, *SRVPGM, *FILE, *DTAARA ...)
+        ref_pgm_col = cols.get("WHRECP", cols.get("REFPGM",  cols.get("WHRFNM", None)))
+        ref_lib_col = cols.get("WHRELI", cols.get("REFLIB",  cols.get("WHRFLB", None)))
+        obj_typ_col = cols.get("WHOBJT", cols.get("REFOBJT", cols.get("WHRFTP", None)))
+        src_pgm_col = cols.get("WHPNAM", cols.get("PGMNAM",  cols.get("WHRPNM", None)))
+
+        for _, row in df.iterrows():
+            callee     = str(row[ref_pgm_col]).strip() if ref_pgm_col else "?"
+            callee_lib = str(row[ref_lib_col]).strip() if ref_lib_col else "?"
+            obj_type   = str(row[obj_typ_col]).strip() if obj_typ_col else "?"
+            caller     = str(row[src_pgm_col]).strip() if src_pgm_col else pgm
+
+            if not callee or callee in ("", "*N", "?"):
+                continue
+
+            all_edges.append({
+                "DEPTH":      depth + 1,
+                "CALLER_LIB": lib,
+                "CALLER":     caller if caller else pgm,
+                "CALLEE_LIB": callee_lib,
+                "CALLEE":     callee,
+                "OBJ_TYPE":   obj_type,
+                "EDGE_KEY":   f"{lib}/{pgm} → {callee_lib}/{callee}"
+            })
+
+            # Nur Programme und Service-Programme weiter verfolgen
+            if obj_type in ("*PGM", "*SRVPGM", "PGM", "SRVPGM") and depth + 1 <= max_depth:
+                queue.append((callee, callee_lib, depth + 1))
+
+    df_tree = pd.DataFrame(all_edges).drop_duplicates(subset=["EDGE_KEY"])
+
+    # Baumdarstellung für Konsole
+    print(f"\n  Call-Tree ({len(df_tree)} Kanten, {len(visited)} Programme analysiert):\n")
+    _print_tree(df_tree, root_pgm, root_lib, depth=0, prefix="")
+
+    return df_tree
+
+
+def _print_tree(df: pd.DataFrame, pgm: str, lib: str, depth: int, prefix: str):
+    """Rekursive Konsolenausgabe des Call-Trees."""
+    if depth > MAX_CALL_DEPTH:
+        return
+    children = df[(df["CALLER"].str.strip().str.upper() == pgm.upper()) &
+                  (df["CALLER_LIB"].str.strip().str.upper() == lib.upper())]
+    for i, (_, row) in enumerate(children.iterrows()):
+        is_last    = (i == len(children) - 1)
+        connector  = "└── " if is_last else "├── "
+        ext_prefix = "    " if is_last else "│   "
+        print(f"  {prefix}{connector}{row['CALLEE_LIB']}/{row['CALLEE']}  [{row['OBJ_TYPE']}]")
+        _print_tree(df, row["CALLEE"], row["CALLEE_LIB"], depth + 1, prefix + ext_prefix)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCHRITT 3: Letzter Spool-File des Jobs
+# ══════════════════════════════════════════════════════════════════════════════
+def get_last_spool_file(conn, job_name: str) -> pd.DataFrame:
+    """
+    Sucht den letzten Spool-File des Jobs und liest dessen Inhalt.
+    Versucht QSYS2.OUTPUT_QUEUE_ENTRIES, Fallback via WRKSPLF → Outfile.
+    """
+    print(f"\n{'='*60}")
+    print(f"[3] Letzter Spool-File für Job: {job_name}")
+    print(f"{'='*60}")
+
+    # Variante A: QSYS2.OUTPUT_QUEUE_ENTRIES (V7+)
+    sql_oqe = f"""
+        SELECT
+            JOB_NAME,
+            JOB_USER,
+            JOB_NUMBER,
+            SPOOLED_FILE_NAME,
+            FILE_NUMBER,
+            STATUS,
+            CREATION_TIMESTAMP,
+            OUTPUT_QUEUE_NAME,
+            OUTPUT_QUEUE_LIBRARY,
+            FORM_TYPE,
+            COPIES,
+            PAGES,
+            CURRENT_PAGE
+        FROM QSYS2.OUTPUT_QUEUE_ENTRIES
+        WHERE UPPER(JOB_NAME) LIKE UPPER('%{job_name}%')
+        ORDER BY CREATION_TIMESTAMP DESC
+        FETCH FIRST 10 ROWS ONLY
+    """
+    df_oqe = run_query(conn, sql_oqe, "OUTPUT_QUEUE_ENTRIES")
+
+    if df_oqe.empty:
+        # Variante B: WRKSPLF OUTPUT(*OUTFILE)
+        print("  Fallback: WRKSPLF OUTPUT(*OUTFILE)...")
+        cl = (
+            f"WRKSPLF SELECT(*ALL {job_name} *ALL *ALL) "
+            f"OUTPUT(*OUTFILE) "
+            f"OUTFILE({MY_SCHEMA}/SPLF_OUT) "
+            f"OUTMBR(*FIRST *REPLACE)"
+        )
+        ok = run_cl(conn, cl)
+        if ok:
+            df_oqe = run_query(conn, f"SELECT * FROM {MY_SCHEMA}.SPLF_OUT", "SPLF_OUT Outfile")
+            df_oqe = drop_binary_cols(df_oqe)
+
+    if df_oqe.empty:
+        print("  ✗ Kein Spool-File gefunden")
+        return pd.DataFrame()
+
+    print(f"\n  Gefundene Spool-Files ({len(df_oqe)}):")
+    for _, row in df_oqe.head(5).iterrows():
+        ts  = row.get("CREATION_TIMESTAMP", row.get("SPLFCDT", "?"))
+        fnm = row.get("SPOOLED_FILE_NAME",  row.get("SPLFNM",  "?"))
+        jnb = row.get("JOB_NUMBER",         row.get("SPLJNB",  "?"))
+        print(f"    • {fnm} | Job# {jnb} | {ts}")
+
+    # Neuesten Spool-File lesen via CPYSPLF → Outfile
+    latest = df_oqe.iloc[0]
+    splf_name = str(latest.get("SPOOLED_FILE_NAME", latest.get("SPLFNM", ""))).strip()
+    job_user  = str(latest.get("JOB_USER",  latest.get("SPLUSRNAM", "*ALL"))).strip()
+    job_nbr   = str(latest.get("JOB_NUMBER", latest.get("SPLJNB", "*ONLY"))).strip()
+
+    df_content = pd.DataFrame()
+
+    if splf_name:
+        print(f"\n  Lese Inhalt von Spool-File: {splf_name} (Job# {job_nbr})...")
+
+        # CPYSPLF → Textdatei im IFS (sauberste Methode)
+        ifs_path = f"/tmp/spool_{job_name}_{job_nbr}.txt"
+        cl_copy  = (
+            f"CPYSPLF FILE({splf_name}) "
+            f"TOFILE(*TOSTMF) "
+            f"JOB({job_nbr}/{job_user}/{job_name}) "
+            f"SPLNBR(*LAST) "
+            f"TOSTMF('{ifs_path}') "
+            f"STMFOPT(*REPLACE) "
+            f"WSCST(*NONE)"
+        )
+        ok_ifs = run_cl(conn, cl_copy)
+
+        if ok_ifs:
+            # IFS-Datei via SQL lesen
+            sql_ifs = f"""
+                SELECT LINE_NUMBER,
+                       CAST(CAST(LINE AS VARCHAR(256) CCSID 1252) AS VARCHAR(256)) AS LINE_TEXT
+                FROM TABLE(QSYS2.IFS_READ_UTF8(
+                    PATH_NAME => '{ifs_path}',
+                    END_OF_LINE => '*ANY',
+                    MAXIMUM_LINE_LENGTH => 256
+                )) AS T
+                FETCH FIRST {MAX_SPOOL_LINES} ROWS ONLY
+            """
+            df_content = run_query(conn, sql_ifs, f"IFS Spool-Inhalt (max. {MAX_SPOOL_LINES} Zeilen)")
+
+        if df_content.empty:
+            # Fallback: CPYSPLF in DB2-Datei
+            print("  Fallback: CPYSPLF → DB2-Datei...")
+            cl_db2 = (
+                f"CPYSPLF FILE({splf_name}) "
+                f"TOFILE({MY_SCHEMA}/SPLCONT_OUT) "
+                f"JOB({job_nbr}/{job_user}/{job_name}) "
+                f"SPLNBR(*LAST) "
+                f"MBROPT(*REPLACE)"
+            )
+            ok_db2 = run_cl(conn, cl_db2)
+            if ok_db2:
+                df_content = run_query(
+                    conn,
+                    f"SELECT * FROM {MY_SCHEMA}.SPLCONT_OUT FETCH FIRST {MAX_SPOOL_LINES} ROWS ONLY",
+                    "SPLCONT_OUT Outfile"
+                )
+                df_content = drop_binary_cols(df_content)
+
+    # Konsolenausgabe der ersten Zeilen
+    if not df_content.empty:
+        print(f"\n  ── Spool-File Inhalt (erste {min(30, len(df_content))} Zeilen) ──")
+        text_col = df_content.columns[-1]  # letzte Spalte = Textinhalt
+        for _, row in df_content.head(30).iterrows():
+            print(f"  {str(row[text_col])}")
+        if len(df_content) > 30:
+            print(f"  ... ({len(df_content) - 30} weitere Zeilen im Excel)")
+
+    return pd.concat([df_oqe, df_content], ignore_index=True) if not df_content.empty else df_oqe
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SCHRITT 4: QHST-Einträge für diesen Job
+# ══════════════════════════════════════════════════════════════════════════════
+def get_qhst_for_job(conn, job_name: str) -> pd.DataFrame:
+    """
+    Liest QHST-Einträge die den Job-Namen enthalten.
+    Zeigt Start/Ende, Fehler, aufgerufene Objekte.
+    """
+    print(f"\n{'='*60}")
+    print(f"[4] QHST-History für Job: {job_name} (letzte {HQST_DAYS_BACK} Tage)")
+    print(f"{'='*60}")
+
+    cl = (
+        f"DSPLOG LOG(QHST) "
+        f"PERIOD((*AVAIL) (*AVAIL)) "
+        f"OUTPUT(*OUTFILE) "
+        f"OUTFILE({MY_SCHEMA}/QHST_JOB_OUT) "
+        f"OUTMBR(*FIRST *REPLACE)"
+    )
+    ok = run_cl(conn, cl)
+    if not ok:
+        return pd.DataFrame()
+
+    # Spaltennamen ermitteln
+    try:
+        sample = pd.read_sql(
+            f"SELECT * FROM {MY_SCHEMA}.QHST_JOB_OUT FETCH FIRST 1 ROWS ONLY", conn
+        )
+        cols = {c.upper(): c for c in sample.columns}
+    except Exception:
+        return pd.DataFrame()
+
+    # Adaptives SELECT
+    select_parts = []
+    for candidate in ["MSGID", "MSGF", "MSGTXT", "MSGDTA", "FROMPGM",
+                      "JOBNBR", "JOBNAM", "JOBUSER", "MSGTIME", "MSGDATE",
+                      "MSGSEQ", "MSGTYP"]:
+        if candidate in cols:
+            select_parts.append(cols[candidate])
+
+    if not select_parts:
+        select_parts = ["*"]
+
+    job_col = cols.get("JOBNAM", cols.get("MSGDTA", None))
+    filter_clause = ""
+    if job_col:
+        filter_clause = f"WHERE UPPER({cols.get('JOBNAM', cols.get('MSGDTA'))}) LIKE UPPER('%{job_name}%')"
+
+    sql = f"""
+        SELECT {', '.join(select_parts)}
+        FROM {MY_SCHEMA}.QHST_JOB_OUT
+        {filter_clause}
+        ORDER BY {cols.get('MSGDATE', select_parts[0])}, {cols.get('MSGTIME', select_parts[0])}
+        FETCH FIRST 200 ROWS ONLY
+    """
+    df = run_query(conn, sql, f"QHST Einträge für {job_name}")
+    df = drop_binary_cols(df)
+
+    if not df.empty:
+        print(f"\n  Letzte Einträge:")
+        for _, row in df.tail(10).iterrows():
+            parts = [str(v).strip() for v in row.values if str(v).strip() not in ("", "None")]
+            print(f"    {' | '.join(parts[:5])}")
+
+    return df
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Excel-Export
+# ══════════════════════════════════════════════════════════════════════════════
+def to_excel(sheets: dict, path: Path):
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            if df is None or df.empty:
+                df = pd.DataFrame({"Info": ["Keine Daten verfügbar"]})
+            df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+            ws = writer.sheets[sheet_name[:31]]
+            for col in ws.columns:
+                max_len = max(
+                    (len(str(cell.value)) for cell in col if cell.value is not None),
+                    default=10
+                )
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 80)
+    print(f"\n✅ Excel gespeichert: {path}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════════════════════
+def main(job_name: str = None):
+    if job_name is None:
+        # Kommandozeilenargument oder Konfigurationsvariable
+        if len(sys.argv) > 1:
+            job_name = sys.argv[1].strip().upper()
+        else:
+            job_name = JOB_NAME_INPUT.strip().upper()
+
+    if not job_name or job_name == "MEIN_JOB":
+        print("FEHLER: Bitte Job-Namen angeben!")
+        print("  Option 1: JOB_NAME_INPUT in der Konfiguration setzen")
+        print("  Option 2: python as400_job_deepdive.py JOBNAME")
+        sys.exit(1)
+
+    OUTPUT_EXCEL = OUTPUT_DIR / f"job_deepdive_{job_name}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+
+    print("=" * 60)
+    print(f"AS/400 Job Deep-Dive")
+    print(f"Job:       {job_name}")
+    print(f"DSN:       {DSN} | Schema: {MY_SCHEMA}")
+    print(f"Zeitstempel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
+
+    conn = connect()
+
+    # ── Schritt 1: JOBD
+    jobd_info = get_job_description(conn, job_name)
+    df_jobd   = jobd_info["raw_df"]
+
+    # ── Schritt 2: Call-Tree
+    # Startpunkt: Initial-Programm aus JOBD, fallback = Job-Name selbst
+    root_pgm = jobd_info["inl_pgm"]   or job_name
+    root_lib = jobd_info["inl_pgm_lib"] or jobd_info["jobd_lib"] or "*LIBL"
+
+    if root_lib in ("", "None", "*N"):
+        root_lib = "*LIBL"
+
+    df_calltree = get_call_tree(conn, root_pgm, root_lib)
+
+    # ── Schritt 3: Spool-File
+    df_spool = get_last_spool_file(conn, job_name)
+
+    # ── Schritt 4: QHST
+    df_qhst = get_qhst_for_job(conn, job_name)
+
+    conn.close()
+
+    # ── Excel Export
+    sheets = {
+        "1_JOBD":       df_jobd,
+        "2_CallTree":   df_calltree,
+        "3_SpoolFile":  df_spool,
+        "4_QHST":       df_qhst,
+    }
+
+    # Flat-Zusammenfassung für erstes Sheet
+    summary_data = {
+        "Feld":  ["Job Name", "JOBD", "Init.Programm", "Job Queue",
+                  "Call-Tree Kanten", "Spool-File Zeilen", "QHST Einträge"],
+        "Wert":  [
+            job_name,
+            f"{jobd_info['jobd_lib']}/{jobd_info['jobd_name']}",
+            f"{jobd_info['inl_pgm_lib']}/{jobd_info['inl_pgm']}",
+            jobd_info["job_queue"],
+            len(df_calltree),
+            len(df_spool),
+            len(df_qhst),
+        ]
+    }
+    sheets = {"0_Zusammenfassung": pd.DataFrame(summary_data), **sheets}
+
+    to_excel(sheets, OUTPUT_EXCEL)
+
+    print(f"\n{'='*60}")
+    print("FERTIG — Ergebnisse:")
+    print(f"  JOBD-Info:          {len(df_jobd)} Zeilen")
+    print(f"  Call-Tree:          {len(df_calltree)} Kanten")
+    print(f"  Spool-File:         {len(df_spool)} Zeilen")
+    print(f"  QHST-Einträge:      {len(df_qhst)} Zeilen")
+    print(f"  Excel:              {OUTPUT_EXCEL}")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()
