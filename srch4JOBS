@@ -1,0 +1,387 @@
+"""
+AS/400 Scheduled & Regular Jobs Explorer
+=========================================
+Listet alle regelmäßig ausgeführten Jobs auf einer pre-V7 AS/400.
+Versucht mehrere Quellen und fällt graceful zurück wenn Views fehlen.
+
+Quellen:
+  1. QSYS2.SCHEDULED_JOB_INFO      (V7+ bevorzugt, Fallback via CL)
+  2. Job Schedule via WRKJOBSCDE    (OUTPUT(*OUTFILE) → STEFAN.JOBSCHED_OUT)
+  3. Subsystem Autostart Entries    (via DSPSBSD OUTPUT(*OUTFILE))
+  4. QHST History Log Pattern       (häufig wiederholende Job-Namen → Proxy für Regelmäßigkeit)
+  5. Aktive Jobs nach Job-Typ       (BCH / WTR / SBS = oft Dauerjobs)
+
+Ausgabe: Excel-Datei mit einem Sheet pro Quelle + Konsolenübersicht
+
+Konfiguration:
+"""
+
+import pyodbc
+import pandas as pd
+import sqlite3
+import warnings
+from datetime import datetime, timedelta
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
+
+# ── Konfiguration ────────────────────────────────────────────────────────────
+DSN            = "AS400"          # ODBC-DSN Name
+MY_SCHEMA      = "STEFAN"         # Dein Write-Access Schema
+OUTPUT_DIR     = Path(".")        # Ausgabeverzeichnis
+OUTPUT_EXCEL   = OUTPUT_DIR / f"as400_regular_jobs_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+HQST_DAYS_BACK = 30              # Wie viele Tage QHST rückwärts analysieren
+MIN_RUNS_PROXY = 5               # Mindestanzahl Einträge im QHST um als "regelmäßig" zu gelten
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def connect():
+    conn = pyodbc.connect(f"DSN={DSN}", autocommit=True)
+    conn.setdecoding(pyodbc.SQL_CHAR, encoding="cp1252")
+    conn.setdecoding(pyodbc.SQL_WCHAR, encoding="cp1252")
+    conn.setencoding(encoding="cp1252")
+    return conn
+
+
+def run_query(conn, sql, label=""):
+    """Führt SQL aus, gibt DataFrame zurück. Bei Fehler: leerer DataFrame + Warnung."""
+    try:
+        df = pd.read_sql(sql, conn)
+        print(f"  ✓ {label}: {len(df)} Zeilen")
+        return df
+    except Exception as e:
+        print(f"  ✗ {label}: nicht verfügbar ({e})")
+        return pd.DataFrame()
+
+
+def run_cl(conn, cl_command):
+    """Führt ein CL-Kommando via QSYS2.QCMDEXC aus."""
+    escaped = cl_command.replace("'", "''")
+    length  = len(cl_command)
+    sql = f"CALL QSYS2.QCMDEXC('{escaped}', {length}.00000)"
+    try:
+        conn.execute(sql)
+        return True
+    except Exception as e:
+        print(f"    CL-Fehler: {e}")
+        return False
+
+
+def drop_binary_cols(df):
+    """Entfernt binäre/nicht-serialisierbare Spalten (bekanntes AS/400-Problem)."""
+    bad = [c for c in df.columns if df[c].dtype == object and
+           df[c].dropna().apply(lambda x: isinstance(x, (bytes, bytearray))).any()]
+    if bad:
+        df = df.drop(columns=bad)
+    return df
+
+
+# ── Quelle 1: QSYS2.SCHEDULED_JOB_INFO ──────────────────────────────────────
+def get_scheduled_job_info(conn):
+    print("\n[1] QSYS2.SCHEDULED_JOB_INFO (V7+)...")
+    sql = """
+        SELECT
+            JOB_NAME,
+            JOB_DESCRIPTION,
+            JOB_DESCRIPTION_LIBRARY,
+            SCHEDULE_DATE,
+            SCHEDULE_TIME,
+            FREQUENCY,
+            RELATIVE_DAY_OF_MONTH,
+            DAY_OF_WEEK,
+            RECOVERY_ACTION,
+            OMIT_DATES,
+            JOB_QUEUE_NAME,
+            JOB_QUEUE_LIBRARY,
+            MESSAGE_QUEUE,
+            STATUS,
+            LAST_SUBMISSION_DATE,
+            LAST_SUBMISSION_TIME,
+            NEXT_SUBMISSION_DATE,
+            NEXT_SUBMISSION_TIME,
+            TEXT_DESCRIPTION
+        FROM QSYS2.SCHEDULED_JOB_INFO
+        ORDER BY JOB_NAME
+    """
+    return run_query(conn, sql, "SCHEDULED_JOB_INFO")
+
+
+# ── Quelle 2: WRKJOBSCDE → Outfile ───────────────────────────────────────────
+def get_jobscde_outfile(conn):
+    """
+    Versucht WRKJOBSCDE OUTPUT(*OUTFILE) als Alternative zu SCHEDULED_JOB_INFO.
+    Schreibt nach STEFAN.JOBSCHED_OUT.
+    """
+    print("\n[2] WRKJOBSCDE OUTPUT(*OUTFILE)...")
+    outfile = f"{MY_SCHEMA}.JOBSCHED_OUT"
+
+    # Outfile erzeugen
+    cl = (
+        f"WRKJOBSCDE OUTPUT(*OUTFILE) "
+        f"OUTFILE({MY_SCHEMA}/JOBSCHED_OUT) "
+        f"OUTMBR(*FIRST *REPLACE)"
+    )
+    ok = run_cl(conn, cl)
+    if not ok:
+        print("  ✗ WRKJOBSCDE fehlgeschlagen")
+        return pd.DataFrame()
+
+    sql = f"SELECT * FROM {outfile}"
+    df  = run_query(conn, sql, "JOBSCHED_OUT Outfile")
+    return drop_binary_cols(df)
+
+
+# ── Quelle 3: Aktive Jobs nach Typ (BCH, WTR, SBS) ───────────────────────────
+def get_active_batch_jobs(conn):
+    print("\n[3] Aktive Jobs (BCH/WTR/SBS) via QSYS2.ACTIVE_JOB_INFO...")
+    sql = """
+        SELECT
+            JOB_NAME,
+            JOB_USER,
+            JOB_NUMBER,
+            JOB_TYPE,
+            JOB_STATUS,
+            JOB_SUBSYSTEM,
+            CPU_TIME,
+            ELAPSED_CPU_PERCENTAGE,
+            FUNCTION_TYPE,
+            FUNCTION,
+            MEMORY_POOL,
+            RUN_PRIORITY,
+            THREAD_COUNT,
+            TOTAL_DISK_IO_COUNT
+        FROM QSYS2.ACTIVE_JOB_INFO
+        WHERE JOB_TYPE IN ('BCH', 'WTR', 'SBS', 'ASJ')
+        ORDER BY JOB_TYPE, JOB_NAME
+    """
+    return run_query(conn, sql, "ACTIVE_JOB_INFO (BCH/WTR/SBS)")
+
+
+# ── Quelle 4: JOBD (Job Descriptions) ────────────────────────────────────────
+def get_job_descriptions(conn):
+    print("\n[4] Job Descriptions (QSYS2.JOB_DESCRIPTION_INFO)...")
+    sql = """
+        SELECT
+            JOB_DESCRIPTION_NAME,
+            JOB_DESCRIPTION_LIBRARY,
+            JOB_QUEUE_NAME,
+            JOB_QUEUE_LIBRARY,
+            JOB_PRIORITY,
+            OUTPUT_QUEUE_NAME,
+            OUTPUT_QUEUE_LIBRARY,
+            PRINT_DEVICE,
+            USER_NAME,
+            ACCOUNTING_CODE,
+            MESSAGE_LOGGING_LEVEL,
+            TEXT_DESCRIPTION
+        FROM QSYS2.JOB_DESCRIPTION_INFO
+        WHERE JOB_DESCRIPTION_LIBRARY NOT IN ('QSYS', 'QGPL', 'QUSRSYS')
+        ORDER BY JOB_DESCRIPTION_LIBRARY, JOB_DESCRIPTION_NAME
+    """
+    return run_query(conn, sql, "JOB_DESCRIPTION_INFO")
+
+
+# ── Quelle 5: QHST Muster-Analyse (Proxy für Regelmäßigkeit) ─────────────────
+def get_qhst_patterns(conn):
+    """
+    Analysiert QHST (System History Log) auf CPF1164/CPF1163 (Job-End/Start).
+    Jobs die in den letzten N Tagen oft vorkommen → wahrscheinlich regelmäßig.
+    Schreibt Outfile nach STEFAN.QHST_JOBS_OUT.
+    """
+    print(f"\n[5] QHST-Muster (letzte {HQST_DAYS_BACK} Tage, min. {MIN_RUNS_PROXY}x)...")
+
+    # DSPLOG → Outfile
+    from_date = (datetime.now() - timedelta(days=HQST_DAYS_BACK)).strftime("%Y-%m-%d")
+    cl = (
+        f"DSPLOG LOG(QHST) "
+        f"PERIOD((*AVAIL) (*AVAIL)) "
+        f"MSGID(CPF1164) "
+        f"OUTPUT(*OUTFILE) "
+        f"OUTFILE({MY_SCHEMA}/QHST_JOBS_OUT) "
+        f"OUTMBR(*FIRST *REPLACE)"
+    )
+    ok = run_cl(conn, cl)
+    if not ok:
+        print("  ✗ DSPLOG fehlgeschlagen")
+        return pd.DataFrame()
+
+    # Spaltennamen ermitteln (pre-V7 safe)
+    try:
+        cols_df = pd.read_sql(
+            f"SELECT * FROM {MY_SCHEMA}.QHST_JOBS_OUT FETCH FIRST 1 ROWS ONLY",
+            conn
+        )
+        available_cols = set(cols_df.columns.str.upper())
+    except Exception as e:
+        print(f"  ✗ QHST_JOBS_OUT nicht lesbar: {e}")
+        return pd.DataFrame()
+
+    # Relevante Spalten adaptiv auswählen
+    select_parts = ["MSGID"]
+    for candidate in ["MSGF", "MSGTXT", "MSGDTA", "FROMPGM", "SENDERFUNC",
+                      "JOBNBR", "JOBNAM", "JOBUSER", "MSGTIME", "MSGDATE"]:
+        if candidate in available_cols:
+            select_parts.append(candidate)
+
+    sql = f"""
+        SELECT {', '.join(select_parts)}
+        FROM {MY_SCHEMA}.QHST_JOBS_OUT
+        WHERE MSGID IN ('CPF1164', 'CPF1163')
+    """
+    df = run_query(conn, sql, "QHST raw (CPF1164/CPF1163)")
+    if df.empty:
+        return df
+
+    df = drop_binary_cols(df)
+
+    # Job-Namen aus MSGDTA extrahieren (CPF1164: Bytes 1-10 = Jobname)
+    job_col = None
+    for c in ["JOBNAM", "MSGDTA"]:
+        if c in df.columns:
+            job_col = c
+            break
+
+    if job_col:
+        if job_col == "MSGDTA":
+            df["EXTRACTED_JOBNAME"] = df["MSGDTA"].astype(str).str[:10].str.strip()
+        else:
+            df["EXTRACTED_JOBNAME"] = df[job_col].astype(str).str.strip()
+
+        # Häufigkeiten
+        freq = (df.groupby("EXTRACTED_JOBNAME")
+                  .size()
+                  .reset_index(name="RUN_COUNT")
+                  .query(f"RUN_COUNT >= {MIN_RUNS_PROXY}")
+                  .sort_values("RUN_COUNT", ascending=False))
+
+        print(f"  → {len(freq)} Jobs mit >= {MIN_RUNS_PROXY} Einträgen gefunden")
+        return freq
+    else:
+        print("  ✗ Kein Job-Namensfeld in QHST gefunden")
+        return df
+
+
+# ── Quelle 6: Subsystem Autostart Entries ────────────────────────────────────
+def get_subsystem_autostart(conn):
+    """
+    Listet Subsysteme und ihre Autostart-Job-Entries auf.
+    Verwendet QSYS2.SUBSYSTEM_INFO falls verfügbar, sonst DSPSBSD.
+    """
+    print("\n[6] Subsystem Autostart Entries (QSYS2.SUBSYSTEM_INFO)...")
+    sql = """
+        SELECT
+            SUBSYSTEM_DESCRIPTION,
+            SUBSYSTEM_LIBRARY,
+            STATUS,
+            MAXIMUM_ACTIVE_JOBS,
+            CURRENT_ACTIVE_JOBS,
+            TEXT_DESCRIPTION
+        FROM QSYS2.SUBSYSTEM_INFO
+        WHERE STATUS = 'ACTIVE'
+        ORDER BY SUBSYSTEM_DESCRIPTION
+    """
+    df = run_query(conn, sql, "SUBSYSTEM_INFO")
+
+    # Autostart-Entries pro Subsystem via DSPSBSD
+    if not df.empty:
+        print("  Versuche DSPSBSD für Autostart-Entries...")
+        autostart_rows = []
+        for _, row in df.iterrows():
+            sbs_lib = str(row.get("SUBSYSTEM_LIBRARY", "QSYS")).strip()
+            sbs_name = str(row.get("SUBSYSTEM_DESCRIPTION", "")).strip()
+            if not sbs_name:
+                continue
+            out_mbr = f"{MY_SCHEMA}/SBSAUTO_OUT"
+            cl = (
+                f"DSPSBSD SBSD({sbs_lib}/{sbs_name}) "
+                f"OUTPUT(*OUTFILE) "
+                f"OUTFILE({MY_SCHEMA}/SBSAUTO_OUT) "
+                f"OUTMBR(*FIRST *REPLACE)"
+            )
+            ok = run_cl(conn, cl)
+            if ok:
+                try:
+                    tmp = pd.read_sql(f"SELECT * FROM {MY_SCHEMA}.SBSAUTO_OUT", conn)
+                    tmp = drop_binary_cols(tmp)
+                    tmp["SOURCE_SUBSYSTEM"] = sbs_name
+                    autostart_rows.append(tmp)
+                except Exception:
+                    pass
+
+        if autostart_rows:
+            return df, pd.concat(autostart_rows, ignore_index=True)
+
+    return df, pd.DataFrame()
+
+
+# ── Excel-Export ──────────────────────────────────────────────────────────────
+def to_excel(sheets: dict, path: Path):
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            if df is None or df.empty:
+                df = pd.DataFrame({"Info": ["Keine Daten verfügbar oder Quelle nicht erreichbar"]})
+            # Spaltennamen kürzen (Excel-Limit 31 Zeichen für Sheetnamen)
+            safe_name = sheet_name[:31]
+            df.to_excel(writer, sheet_name=safe_name, index=False)
+
+            # Spaltenbreite anpassen
+            ws = writer.sheets[safe_name]
+            for col in ws.columns:
+                max_len = max(
+                    (len(str(cell.value)) for cell in col if cell.value is not None),
+                    default=10
+                )
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 60)
+    print(f"\n✅ Excel gespeichert: {path}")
+
+
+# ── Konsolenübersicht ─────────────────────────────────────────────────────────
+def print_summary(results: dict):
+    print("\n" + "="*60)
+    print("ZUSAMMENFASSUNG — Regelmäßige Jobs auf der AS/400")
+    print("="*60)
+    for name, df in results.items():
+        if df is not None and not df.empty:
+            print(f"\n  [{name}] → {len(df)} Einträge")
+            # Erste paar Zeilen anzeigen
+            preview_col = df.columns[0]
+            for val in df[preview_col].head(5):
+                print(f"    • {str(val).strip()}")
+            if len(df) > 5:
+                print(f"    ... und {len(df) - 5} weitere")
+        else:
+            print(f"\n  [{name}] → nicht verfügbar")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+def main():
+    print("AS/400 Scheduled Jobs Explorer")
+    print(f"DSN: {DSN} | Schema: {MY_SCHEMA}")
+    print(f"Zeitstempel: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+    conn = connect()
+
+    results = {}
+
+    # Quellen abfragen
+    results["1_SCHEDULED_JOB_INFO"] = get_scheduled_job_info(conn)
+    results["2_WRKJOBSCDE_Outfile"]  = get_jobscde_outfile(conn)
+    results["3_Active_BCH_WTR_SBS"]  = get_active_batch_jobs(conn)
+    results["4_Job_Descriptions"]    = get_job_descriptions(conn)
+    results["5_QHST_Patterns"]       = get_qhst_patterns(conn)
+
+    sbs_info, autostart = get_subsystem_autostart(conn)
+    results["6_Subsystems"]          = sbs_info
+    results["6b_Autostart_Entries"]  = autostart
+
+    conn.close()
+
+    # Ausgabe
+    print_summary(results)
+    to_excel(results, OUTPUT_EXCEL)
+
+    return results
+
+
+if __name__ == "__main__":
+    main()
