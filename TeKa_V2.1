@@ -1,0 +1,2919 @@
+Option Explicit
+
+' Optionales Schutzpasswort.
+' Leer lassen = Blattschutz ohne Passwort.
+' Hinweis: Ein Passwort im VBA-Code ist kein echter Sicherheitsschutz,
+' sondern nur ein Bearbeitungsschutz.
+Private KALENDER_SCHUTZ_PASSWORT As String
+
+' Vertraglicher monatlicher Urlaubsanspruch je aktivem Mitarbeiter-Monat.
+' Standard: 2,5 Tage pro aktivem Monat.
+' Sonderfälle, z. B. Eintritt mitten im Monat, können bei Bedarf
+' in der ausgeblendeten Hilfsspalte AO manuell angepasst werden.
+Private Const VERTRGL_URLAUB As Double = 2.5
+
+
+
+
+
+' ============================================================
+' Modul: modKalenderDynamisch
+'
+' Zweck:
+'   Dynamischer Aufbau der Monatsblöcke im Kalenderblatt
+'   inklusive Mitarbeiterlogik, Spezialformatierung,
+'   Dropdowns, Status-Farbregeln, Statusformeln,
+'   Statistik, Statuscode-Legende und Zellschutz.
+'
+' Version 2.0 - Arbeitsstand 1:
+'   - Abteilungen werden hart im VBA-Code geführt.
+'   - IT-Security wurde zu IT-Compliance geändert.
+'   - Business-Transformation wurde zu Business Transformation geändert.
+'   - Statusfarben werden hart über StatusFarbDictionary geführt.
+'   - tblStatus wird für Farben und Dropdowns nicht mehr benötigt.
+'   - StatusDropdownCodes wird aus einer sichtbaren Legende im Kalenderblatt erzeugt.
+'   - Dropdowns beziehen sich auf diese sichtbare Statuscode-Legende.
+'   - Nicht verwendete Tagesspalten bei Monaten mit weniger als 31 Tagen
+'     werden ohne störende innere Linien dargestellt.
+'   - URLAUB_PRO_AKTIVEM_MONAT wurde zu VERTRGL_URLAUB umbenannt.
+'
+' Voraussetzungen:
+'   - Aktives Blatt beginnt mit "Kalender", z. B. "Kalender" oder "Kalender_2026"
+'   - In H1 steht ein echtes Datum, z. B. 01.01.2026
+'   - Blatt "Mitarbeiter" existiert
+'   - Blatt "Parameter" existiert noch für tblMapping, tblFeiertage, tblFerien
+'   - Benannter Bereich "tblMapping" existiert
+'     mit SpeicherCode / AnzeigeCode
+'   - Tabelle "tblFeiertage" existiert im Blatt "Parameter"
+'   - Tabelle "tblFerien" existiert im Blatt "Parameter"
+'
+' Nicht mehr benötigt:
+'   - tblStatus
+'   - StatusAnzeigeCodes
+'   - Abteilungen im Parameterblatt
+'
+' Mitarbeiterblatt:
+'       A: Key
+'       B: Name
+'       C: Vorname
+'       D: Anzeigename
+'       E: Abteilung
+'       F: Startdatum
+'       G: Enddatum
+'       H: Urlaubstage
+'       I: Bemerkung
+'
+' Kalender:
+'       D:AH = Tagesbereich
+'
+' Statistik sichtbar:
+'       X  = IST
+'       Y  = Soll
+'       Z  = offen
+'       AA = Abteilung / Mitarbeiter
+'       AE = MW
+'       AF = K
+'       AG = Sonst
+'       AH = Büro
+'
+' Statistik-Hilfsspalten:
+'       AJ = Urlaub IST
+'       AK = MW
+'       AL = K
+'       AM = Sonstiges
+'       AN = Büro
+'       AO = Urlaub Soll
+' ============================================================
+
+
+' ============================================================
+' Hart definierte Abteilungen
+'
+' Diese Reihenfolge bestimmt:
+'   - Reihenfolge der Abteilungsblöcke in den Monatsblöcken
+'   - Reihenfolge der Abteilungen in der Jahresstatistik
+'
+' Wichtig:
+'   Die Werte müssen mit Spalte E im Mitarbeiterblatt
+'   exakt übereinstimmen.
+' ============================================================
+
+Private Function KalenderAbteilungen() As Variant
+
+    KalenderAbteilungen = Array( _
+        "IT-Operations", _
+        "IT-Compliance", _
+        "Business Transformation" _
+    )
+
+End Function
+
+
+' ============================================================
+' Feste Farbzuordnung für Statuscodes
+'
+' Hinweis:
+'   VBA erlaubt keine direkt initialisierten Const-Dictionaries.
+'   Daher wird die feste Farbzuordnung einmalig als Static Dictionary
+'   aufgebaut und anschließend wiederverwendet.
+'
+' Grundlage:
+'   Key   = AnzeigeCode im Kalender
+'   Value = RGB-Farbwert
+' ============================================================
+
+Private Function StatusFarbDictionary() As Object
+
+    Static dict As Object
+
+    If dict Is Nothing Then
+
+        Set dict = CreateObject("Scripting.Dictionary")
+
+        ' Dienste
+        dict.Add "FD", RGB(146, 208, 80)        ' grün
+        dict.Add "FD/MW", RGB(146, 208, 80)     ' grün
+
+        dict.Add "SD", RGB(201, 85, 21)         ' braun
+        dict.Add "SD/MW", RGB(201, 85, 21)      ' braun
+
+        ' Mobile Work
+        dict.Add "MW", RGB(255, 255, 0)         ' gelb
+
+        ' Sonderzeiten / Abwesenheiten
+        dict.Add "17h", RGB(217, 217, 217)      ' grau
+
+        dict.Add "UT", RGB(192, 230, 245)       ' hellblau
+        dict.Add "UT5", RGB(192, 230, 245)      ' hellblau
+        dict.Add "SU", RGB(192, 230, 245)       ' hellblau
+
+        dict.Add "GT", RGB(228, 158, 221)       ' lila
+        dict.Add "GT5", RGB(228, 158, 221)      ' lila
+
+        dict.Add "K", RGB(255, 199, 206)        ' rot
+        dict.Add "Schu", RGB(126, 53, 14)       ' dunkelbraun
+        dict.Add "DR", RGB(255, 192, 0)         ' orange
+        dict.Add "SAD", RGB(77, 147, 217)       ' blau
+
+        ' Sonstiges / neutral
+        dict.Add "--", RGB(255, 255, 255)       ' weiß
+
+    End If
+
+    Set StatusFarbDictionary = dict
+
+End Function
+
+
+' ============================================================
+' Feste Reihenfolge der Statuscodes
+'
+' Diese Reihenfolge bestimmt:
+'   - die sichtbare Statuscode-Legende im Kalenderblatt
+'   - die Reihenfolge der Dropdown-Auswahl
+' ============================================================
+
+Private Function StatusCodeListe() As Variant
+
+    StatusCodeListe = Array( _
+        "FD", _
+        "SD", _
+        "MW", _
+        "FD/MW", _
+        "SD/MW", _
+        "17h", _
+        "UT", _
+        "UT5", _
+        "SU", _
+        "GT", _
+        "GT5", _
+        "K", _
+        "Schu", _
+        "DR", _
+        "SAD", _
+        "--" _
+    )
+
+End Function
+
+
+' ============================================================
+' Beschreibung eines Statuscodes für die sichtbare Legende
+' ============================================================
+
+Private Function StatusBeschreibung(ByVal code As String) As String
+
+    Select Case code
+
+        Case "FD"
+            StatusBeschreibung = "Frühdienst"
+
+        Case "SD"
+            StatusBeschreibung = "Spätdienst"
+
+        Case "MW"
+            StatusBeschreibung = "Mobile Work"
+
+        Case "FD/MW"
+            StatusBeschreibung = "Frühdienst und Mobile Work"
+
+        Case "SD/MW"
+            StatusBeschreibung = "Spätdienst und Mobile Work"
+
+        Case "17h"
+            StatusBeschreibung = "Dienst bis 17 Uhr"
+
+        Case "UT"
+            StatusBeschreibung = "Urlaubstag"
+
+        Case "UT5"
+            StatusBeschreibung = "halber Urlaubstag"
+
+        Case "SU"
+            StatusBeschreibung = "Sonderurlaub"
+
+        Case "GT"
+            StatusBeschreibung = "Gleittag"
+
+        Case "GT5"
+            StatusBeschreibung = "halber Gleittag"
+
+        Case "K"
+            StatusBeschreibung = "Krankheit"
+
+        Case "Schu"
+            StatusBeschreibung = "Schulung"
+
+        Case "DR"
+            StatusBeschreibung = "Dienstreise"
+
+        Case "SAD"
+            StatusBeschreibung = "Sonderdienst / sonstige Abwesenheit"
+
+        Case "--"
+            StatusBeschreibung = "Sonstiges / nicht zugeordnet"
+
+        Case Else
+            StatusBeschreibung = ""
+
+    End Select
+
+End Function
+
+
+Public Sub Monatsbloecke_Dynamisch_Erstellen()
+
+    Dim wsKal As Worksheet
+    Dim wsMA As Worksheet
+
+    Dim dictKalenderSpeicher As Object
+    Dim dictAnzeigeToSpeicher As Object
+    Dim dictSpeicherToAnzeige As Object
+
+    Dim jahrDatum As Date
+    Dim jahr As Long
+    Dim monat As Long
+
+    Dim blockStartRow As Long
+    Dim blockEndRow As Long
+    Dim blockHeight As Long
+    Dim letzteKalenderZeile As Long
+
+    Dim firstDayCol As Long
+    Dim lastDayCol As Long
+    Dim daysInMonth As Long
+
+    Dim monthStart As Date
+    Dim monthEnd As Date
+    Dim monthName As String
+
+    Dim deptList As Variant
+
+    Dim opsNames As Variant
+    Dim secNames As Variant
+    Dim busNames As Variant
+
+    ' --------------------------------------------------------
+    ' Kalenderblatt bestimmen
+    ' --------------------------------------------------------
+    Set wsKal = ActiveSheet
+
+    If Not wsKal.name Like "Kalender*" Then
+        MsgBox "Bitte zuerst ein Kalenderblatt aktivieren.", vbExclamation
+        Exit Sub
+    End If
+
+    ' --------------------------------------------------------
+    ' Mitarbeiterblatt bestimmen
+    ' --------------------------------------------------------
+    On Error Resume Next
+    Set wsMA = ThisWorkbook.Worksheets("Mitarbeiter")
+    On Error GoTo 0
+
+    If wsMA Is Nothing Then
+        MsgBox "Das Blatt 'Mitarbeiter' wurde nicht gefunden.", vbExclamation
+        Exit Sub
+    End If
+
+    ' --------------------------------------------------------
+    ' Gitternetzlinien ausblenden
+    ' --------------------------------------------------------
+    wsKal.Activate
+    ActiveWindow.DisplayGridlines = False
+
+    ' --------------------------------------------------------
+    ' Blattschutz vor dem Neuaufbau aufheben
+    ' --------------------------------------------------------
+    Call SchalteBlattschutzAus(wsKal)
+
+    ' --------------------------------------------------------
+    ' Jahr aus H1 lesen
+    ' --------------------------------------------------------
+    If Not IsDate(wsKal.Range("H1").Value) Then
+        MsgBox "In Zelle H1 muss ein gültiges Datum stehen, z. B. 01.01.2026.", vbExclamation
+        Exit Sub
+    End If
+
+    jahrDatum = wsKal.Range("H1").Value
+    jahr = Year(jahrDatum)
+
+    ' --------------------------------------------------------
+    ' Abteilungen laden
+    ' --------------------------------------------------------
+    deptList = KalenderAbteilungen()
+
+    ' --------------------------------------------------------
+    ' Mapping-Dictionaries laden
+    ' --------------------------------------------------------
+    Call LadeMappingDictionaries( _
+        dictAnzeigeToSpeicher:=dictAnzeigeToSpeicher, _
+        dictSpeicherToAnzeige:=dictSpeicherToAnzeige)
+
+    ' --------------------------------------------------------
+    ' Bestehende Kalendereinträge vor dem Neuaufbau sichern
+    ' --------------------------------------------------------
+    Set dictKalenderSpeicher = SichereKalendereintraege( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        firstDayCol:=4, _
+        lastDayCol:=34, _
+        dictAnzeigeToSpeicher:=dictAnzeigeToSpeicher)
+
+    ' --------------------------------------------------------
+    ' Grundparameter
+    ' --------------------------------------------------------
+    firstDayCol = 4          ' Spalte D
+    lastDayCol = 34          ' Spalte AH
+    blockStartRow = 5        ' Januar beginnt immer in Zeile 5
+
+    ' --------------------------------------------------------
+    ' Alten Kalenderbereich inklusive Statistik/Hilfsspalten leeren
+    ' --------------------------------------------------------
+    wsKal.Range("A4:AO1000").Clear
+
+    On Error Resume Next
+    wsKal.Range("A4:AO1000").Validation.Delete
+    wsKal.Range("A4:AO1000").FormatConditions.Delete
+    On Error GoTo 0
+
+    ' --------------------------------------------------------
+    ' Zellschutz-Grundzustand:
+    ' Erst einmal den gesamten Arbeitsbereich sperren.
+    ' Nur die später gesetzten Dropdown-Zellen werden gezielt
+    ' wieder entsperrt.
+    ' --------------------------------------------------------
+    With wsKal.Range("A1:AO1000")
+        .Locked = True
+        .FormulaHidden = False
+    End With
+
+    ' Überschriften für Hilfsspalten setzen
+    Call SchreibeHilfsspaltenUeberschriften(wsKal)
+
+    ' Hilfsspalten zunächst wieder einblenden, damit sauber geschrieben werden kann
+    wsKal.Columns("AJ:AO").Hidden = False
+
+    Debug.Print "----------------------------------------"
+    Debug.Print "Dynamischer Kalenderaufbau gestartet"
+    Debug.Print "Kalenderblatt: " & wsKal.name
+    Debug.Print "Jahr: " & jahr
+
+    ' --------------------------------------------------------
+    ' Monate erzeugen
+    ' --------------------------------------------------------
+    For monat = 1 To 12
+
+        monthStart = DateSerial(jahr, monat, 1)
+        monthEnd = DateSerial(jahr, monat + 1, 0)
+        monthName = Format(monthStart, "MMMM")
+        daysInMonth = Day(monthEnd)
+
+        ' Aktive Mitarbeiter je Abteilung holen
+        opsNames = GetAktiveMitarbeiter(wsMA, CStr(deptList(0)), monthStart, monthEnd)
+        secNames = GetAktiveMitarbeiter(wsMA, CStr(deptList(1)), monthStart, monthEnd)
+        busNames = GetAktiveMitarbeiter(wsMA, CStr(deptList(2)), monthStart, monthEnd)
+
+        ' Dynamische Blockhöhe berechnen
+        blockHeight = BerechneBlockhoehe(opsNames, secNames, busNames)
+        blockEndRow = blockStartRow + blockHeight - 1
+
+        Debug.Print monthName & _
+                    " | Startzeile: " & blockStartRow & _
+                    " | Endzeile: " & blockEndRow & _
+                    " | " & CStr(deptList(0)) & ": " & AnzahlArrayEintraege(opsNames) & _
+                    " | " & CStr(deptList(1)) & ": " & AnzahlArrayEintraege(secNames) & _
+                    " | " & CStr(deptList(2)) & ": " & AnzahlArrayEintraege(busNames)
+
+        ' Monatsblock zeichnen
+        Call ZeichneMonatsblock( _
+            wsKal:=wsKal, _
+            monat:=monat, _
+            jahr:=jahr, _
+            monthStart:=monthStart, _
+            monthEnd:=monthEnd, _
+            monthName:=monthName, _
+            blockStartRow:=blockStartRow, _
+            blockEndRow:=blockEndRow, _
+            firstDayCol:=firstDayCol, _
+            lastDayCol:=lastDayCol, _
+            daysInMonth:=daysInMonth, _
+            opsNames:=opsNames, _
+            secNames:=secNames, _
+            busNames:=busNames)
+
+        ' Nächster Monatsblock nach einer Leerzeile
+        blockStartRow = blockEndRow + 3
+
+    Next monat
+
+    ' --------------------------------------------------------
+    ' Letzte Kalenderzeile bestimmen
+    ' --------------------------------------------------------
+    letzteKalenderZeile = blockStartRow - 3
+
+    ' --------------------------------------------------------
+    ' Statuscode-Legende links neben der Jahresstatistik erzeugen
+    ' und daraus die Dropdown-Quelle ableiten.
+    ' --------------------------------------------------------
+    Call ErstelleStatuscodeLegende( _
+        wsKal:=wsKal, _
+        legendStartRow:=letzteKalenderZeile + 3)
+
+    ' --------------------------------------------------------
+    ' Dropdowns im gesamten Kalender setzen
+    ' Quelle ist die eben erzeugte Statuscode-Legende.
+    ' --------------------------------------------------------
+    Call SetzeDropdownsGesamterKalender( _
+        wsKal:=wsKal, _
+        wsMA:=wsMA, _
+        jahr:=jahr, _
+        firstKalenderRow:=5, _
+        lastKalenderRow:=letzteKalenderZeile, _
+        firstDayCol:=firstDayCol, _
+        lastDayCol:=lastDayCol)
+
+    ' --------------------------------------------------------
+    ' Jahresstatistik am Ende des Kalenders erzeugen
+    ' --------------------------------------------------------
+    Call ErstelleJahresstatistik( _
+        wsKal:=wsKal, _
+        wsMA:=wsMA, _
+        jahr:=jahr, _
+        statistikStartRow:=letzteKalenderZeile + 3)
+
+    ' Hilfsspalten für Monatszählungen ausblenden
+    wsKal.Columns("AJ:AO").Hidden = True
+
+    ' --------------------------------------------------------
+    ' Status-Farbregeln einmal global für den Kalenderbereich setzen
+    ' --------------------------------------------------------
+    Call SetzeStatusFarbregelnKalenderbereich( _
+        wsKal:=wsKal, _
+        firstRow:=5, _
+        lastRow:=letzteKalenderZeile, _
+        firstDayCol:=firstDayCol, _
+        lastDayCol:=lastDayCol)
+
+    ' --------------------------------------------------------
+    ' Gesicherte Kalendereinträge nach dem Neuaufbau zurückschreiben
+    ' --------------------------------------------------------
+    Call SchreibeKalendereintraegeZurueck( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        firstDayCol:=firstDayCol, _
+        lastDayCol:=lastDayCol, _
+        dictKalenderSpeicher:=dictKalenderSpeicher, _
+        dictSpeicherToAnzeige:=dictSpeicherToAnzeige)
+
+    ' --------------------------------------------------------
+    ' Blattschutz nach dem Neuaufbau einschalten
+    ' --------------------------------------------------------
+    Call SchalteBlattschutzEin(wsKal)
+
+    MsgBox "Dynamische Monatsblöcke für " & jahr & " wurden erstellt.", vbInformation
+
+End Sub
+
+
+' ============================================================
+' Aktive Mitarbeiter je Abteilung holen
+' ============================================================
+
+Private Function GetAktiveMitarbeiter( _
+    ByVal wsMA As Worksheet, _
+    ByVal abteilung As String, _
+    ByVal monthStart As Date, _
+    ByVal monthEnd As Date) As Variant
+
+    Dim lastRow As Long
+    Dim r As Long
+    Dim count As Long
+
+    Dim anzeigename As String
+    Dim dept As String
+    Dim startVal As Variant
+    Dim endVal As Variant
+    Dim startDatum As Date
+    Dim endDatum As Date
+    Dim istAktiv As Boolean
+
+    Dim names() As String
+
+    lastRow = wsMA.Cells(wsMA.Rows.count, "D").End(xlUp).Row
+
+    count = 0
+
+    For r = 2 To lastRow
+
+        anzeigename = Trim(CStr(wsMA.Cells(r, "D").Value))
+        dept = Trim(CStr(wsMA.Cells(r, "E").Value))
+        startVal = wsMA.Cells(r, "F").Value
+        endVal = wsMA.Cells(r, "G").Value
+
+        If anzeigename <> "" And dept = abteilung Then
+
+            If IsDate(startVal) Then
+
+                startDatum = CDate(startVal)
+
+                If IsDate(endVal) Then
+                    endDatum = CDate(endVal)
+                    istAktiv = (startDatum <= monthEnd And endDatum >= monthStart)
+                Else
+                    istAktiv = (startDatum <= monthEnd)
+                End If
+
+                If istAktiv Then
+                    count = count + 1
+                    ReDim Preserve names(1 To count)
+                    names(count) = anzeigename
+                End If
+
+            End If
+
+        End If
+
+    Next r
+
+    If count = 0 Then
+        GetAktiveMitarbeiter = Empty
+    Else
+        Call SortiereStringArray(names)
+        GetAktiveMitarbeiter = names
+    End If
+
+End Function
+
+
+' ============================================================
+' Dynamische Blockhöhe berechnen
+'
+' Aufbau:
+'   1 Zeile  = Wochentage
+'   n Zeilen = IT-Operations
+'   1 Zeile  = Leerzeile
+'   n Zeilen = IT-Compliance
+'   1 Zeile  = Leerzeile
+'   2 Zeilen = Statusblock
+'   1 Zeile  = Leerzeile
+'   n Zeilen = Business Transformation
+'   1 Zeile  = Kalenderwochen
+' ============================================================
+
+Private Function BerechneBlockhoehe( _
+    ByVal opsNames As Variant, _
+    ByVal secNames As Variant, _
+    ByVal busNames As Variant) As Long
+
+    Dim h As Long
+
+    h = 0
+
+    h = h + 1                                  ' Wochentagszeile
+    h = h + AnzahlArrayEintraege(opsNames)     ' IT-Operations
+    h = h + 1                                  ' Leerzeile
+    h = h + AnzahlArrayEintraege(secNames)     ' IT-Compliance
+    h = h + 1                                  ' Leerzeile
+    h = h + 2                                  ' Statusblock
+    h = h + 1                                  ' Leerzeile
+    h = h + AnzahlArrayEintraege(busNames)     ' Business Transformation
+    h = h + 1                                  ' Kalenderwochenzeile
+
+    BerechneBlockhoehe = h
+
+End Function
+
+
+' ============================================================
+' Einen Monatsblock zeichnen
+' ============================================================
+
+Private Sub ZeichneMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal monat As Long, _
+    ByVal jahr As Long, _
+    ByVal monthStart As Date, _
+    ByVal monthEnd As Date, _
+    ByVal monthName As String, _
+    ByVal blockStartRow As Long, _
+    ByVal blockEndRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long, _
+    ByVal daysInMonth As Long, _
+    ByVal opsNames As Variant, _
+    ByVal secNames As Variant, _
+    ByVal busNames As Variant)
+
+    Dim currentRow As Long
+
+    Dim opsStartRow As Long
+    Dim secStartRow As Long
+    Dim busStartRow As Long
+
+    Dim opsCount As Long
+    Dim secCount As Long
+    Dim busCount As Long
+
+    Dim deptList As Variant
+
+    deptList = KalenderAbteilungen()
+
+    opsCount = AnzahlArrayEintraege(opsNames)
+    secCount = AnzahlArrayEintraege(secNames)
+    busCount = AnzahlArrayEintraege(busNames)
+
+    ' --------------------------------------------------------
+    ' Monatsname links als verbundene Zelle
+    ' --------------------------------------------------------
+    With wsKal.Range(wsKal.Cells(blockStartRow, 1), wsKal.Cells(blockEndRow, 1))
+        .Merge
+        .Value = monthName
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Orientation = 90
+        .Font.Bold = True
+        .Font.Size = 14
+    End With
+
+    ' --------------------------------------------------------
+    ' Wochentage
+    ' --------------------------------------------------------
+    Call SchreibeWochentage(wsKal, blockStartRow, firstDayCol, jahr, monat, daysInMonth)
+
+    currentRow = blockStartRow + 1
+
+    ' --------------------------------------------------------
+    ' IT-Operations
+    ' --------------------------------------------------------
+    opsStartRow = currentRow
+    currentRow = SchreibeAbteilungsblock(wsKal, currentRow, CStr(deptList(0)), opsNames)
+
+    ' Leerzeile
+    currentRow = currentRow + 1
+
+    ' --------------------------------------------------------
+    ' IT-Compliance
+    ' --------------------------------------------------------
+    secStartRow = currentRow
+    currentRow = SchreibeAbteilungsblock(wsKal, currentRow, CStr(deptList(1)), secNames)
+
+    ' Leerzeile
+    currentRow = currentRow + 1
+
+    ' --------------------------------------------------------
+    ' Statusblock
+    ' --------------------------------------------------------
+    wsKal.Cells(currentRow, 3).Value = "Alle Dienste abgedeckt?"
+    wsKal.Cells(currentRow + 1, 3).Value = "3 MA_IT vor Ort?"
+
+    With wsKal.Range(wsKal.Cells(currentRow, 3), wsKal.Cells(currentRow + 1, 3))
+        .Font.Bold = True
+        .HorizontalAlignment = xlLeft
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Statusformeln in die Tageszellen schreiben
+    Call SetzeStatusformelnMonatsblock( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        monat:=monat, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth, _
+        opsStartRow:=opsStartRow, _
+        opsCount:=opsCount, _
+        statusStartRow:=currentRow)
+
+    currentRow = currentRow + 2
+
+    ' Leerzeile
+    currentRow = currentRow + 1
+
+    ' --------------------------------------------------------
+    ' Business Transformation
+    ' --------------------------------------------------------
+    busStartRow = currentRow
+    currentRow = SchreibeAbteilungsblock(wsKal, currentRow, CStr(deptList(2)), busNames)
+
+    ' --------------------------------------------------------
+    ' Kalenderwochenzeile
+    ' --------------------------------------------------------
+    Call SchreibeKalenderwochen(wsKal, currentRow, firstDayCol, jahr, monat, daysInMonth)
+
+    ' --------------------------------------------------------
+    ' Nicht benötigte Tagesspalten bei Monaten mit weniger als 31 Tagen leeren
+    ' --------------------------------------------------------
+    If daysInMonth < 31 Then
+        wsKal.Range(wsKal.Cells(blockStartRow, firstDayCol + daysInMonth), _
+                    wsKal.Cells(blockEndRow, lastDayCol)).Clear
+
+        On Error Resume Next
+        wsKal.Range(wsKal.Cells(blockStartRow, firstDayCol + daysInMonth), _
+                    wsKal.Cells(blockEndRow, lastDayCol)).Validation.Delete
+        On Error GoTo 0
+    End If
+
+    ' --------------------------------------------------------
+    ' Außenrahmen
+    ' --------------------------------------------------------
+    Call SetzeDickenAussenrahmen(wsKal.Range(wsKal.Cells(blockStartRow, 1), _
+                                             wsKal.Cells(blockEndRow, lastDayCol)))
+
+    ' --------------------------------------------------------
+    ' Innenlinien
+    ' --------------------------------------------------------
+    Call SetzeInnenlinien(wsKal.Range(wsKal.Cells(blockStartRow, 2), _
+                                      wsKal.Cells(blockEndRow, lastDayCol)))
+
+    ' --------------------------------------------------------
+    ' Spezialformatierungen
+    ' --------------------------------------------------------
+    Call FormatiereMonatsblockSpezial( _
+        wsKal:=wsKal, _
+        blockStartRow:=blockStartRow, _
+        blockEndRow:=blockEndRow, _
+        firstDayCol:=firstDayCol, _
+        lastDayCol:=lastDayCol, _
+        opsCount:=opsCount, _
+        secCount:=secCount, _
+        busCount:=busCount)
+
+    ' --------------------------------------------------------
+    ' Nicht verwendete Tagesspalten bei Monaten mit weniger
+    ' als 31 Tagen ohne störende innere Linien darstellen
+    ' --------------------------------------------------------
+    Call FormatiereNichtVerwendeteTagesspalten( _
+        wsKal:=wsKal, _
+        blockStartRow:=blockStartRow, _
+        blockEndRow:=blockEndRow, _
+        firstDayCol:=firstDayCol, _
+        lastDayCol:=lastDayCol, _
+        daysInMonth:=daysInMonth)
+
+    ' --------------------------------------------------------
+    ' Wochenenden einfärben
+    ' --------------------------------------------------------
+    Call FaerbeWochenendenMonatsblock( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        monat:=monat, _
+        blockStartRow:=blockStartRow, _
+        blockEndRow:=blockEndRow, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth)
+
+    ' --------------------------------------------------------
+    ' Feiertage markieren
+    ' --------------------------------------------------------
+    Call MarkiereFeiertageMonatsblock( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        monat:=monat, _
+        blockStartRow:=blockStartRow, _
+        firstDayCol:=firstDayCol, _
+        busStartRow:=busStartRow, _
+        busCount:=busCount)
+
+    ' --------------------------------------------------------
+    ' Ferien markieren
+    ' --------------------------------------------------------
+    Call MarkiereFerienMonatsblock( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        monat:=monat, _
+        blockStartRow:=blockStartRow, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth)
+
+    ' --------------------------------------------------------
+    ' Statistikformeln je Mitarbeiter-Monatszeile setzen
+    ' --------------------------------------------------------
+    Call SetzeStatistikformelnMonatsblock( _
+        wsKal:=wsKal, _
+        jahr:=jahr, _
+        monat:=monat, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth, _
+        opsStartRow:=opsStartRow, _
+        opsCount:=opsCount, _
+        secStartRow:=secStartRow, _
+        secCount:=secCount, _
+        busStartRow:=busStartRow, _
+        busCount:=busCount)
+
+    ' --------------------------------------------------------
+    ' Grundformat
+    ' --------------------------------------------------------
+    wsKal.Rows(blockStartRow & ":" & blockEndRow).RowHeight = 20
+
+    wsKal.Columns("A").ColumnWidth = 4
+    wsKal.Columns("B").ColumnWidth = 24
+    wsKal.Columns("C").ColumnWidth = 24
+
+    wsKal.Range(wsKal.Cells(blockStartRow, firstDayCol), _
+                wsKal.Cells(blockEndRow, lastDayCol)).ColumnWidth = 4
+
+    ' Ausrichtung im Tagesbereich
+    With wsKal.Range(wsKal.Cells(blockStartRow, firstDayCol), wsKal.Cells(blockEndRow, lastDayCol))
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Abteilungs-/Namensbereich ausrichten
+    With wsKal.Range(wsKal.Cells(blockStartRow, 2), wsKal.Cells(blockEndRow, 3))
+        .VerticalAlignment = xlCenter
+    End With
+
+End Sub
+
+
+' ============================================================
+' Abteilungsblock schreiben
+'
+' Gibt die nächste freie Zeile nach dem Abteilungsblock zurück.
+' ============================================================
+
+Private Function SchreibeAbteilungsblock( _
+    ByVal ws As Worksheet, _
+    ByVal startRow As Long, _
+    ByVal abteilung As String, _
+    ByVal names As Variant) As Long
+
+    Dim i As Long
+    Dim n As Long
+
+    n = AnzahlArrayEintraege(names)
+
+    If n = 0 Then
+        SchreibeAbteilungsblock = startRow
+        Exit Function
+    End If
+
+    For i = 1 To n
+
+        If i = 1 Then
+            ws.Cells(startRow + i - 1, 2).Value = abteilung
+            ws.Cells(startRow + i - 1, 2).Font.Bold = True
+        End If
+
+        ws.Cells(startRow + i - 1, 3).Value = names(i)
+
+    Next i
+
+    SchreibeAbteilungsblock = startRow + n
+
+End Function
+
+
+' ============================================================
+' Wochentage schreiben
+'
+' Nur Samstag und Sonntag werden fett geschrieben.
+' Normale Wochentage bleiben normal.
+' ============================================================
+
+Private Sub SchreibeWochentage( _
+    ByVal ws As Worksheet, _
+    ByVal targetRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal daysInMonth As Long)
+
+    Dim tag As Long
+    Dim d As Date
+    Dim zielZelle As Range
+
+    For tag = 1 To daysInMonth
+
+        d = DateSerial(jahr, monat, tag)
+        Set zielZelle = ws.Cells(targetRow, firstDayCol + tag - 1)
+
+        With zielZelle
+            .Value = Format(d, "ddd")
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+
+            If Weekday(d, vbMonday) >= 6 Then
+                .Font.Bold = True
+            Else
+                .Font.Bold = False
+            End If
+        End With
+
+    Next tag
+
+End Sub
+
+
+' ============================================================
+' Kalenderwochen schreiben
+'
+' Die KW wird jeweils in der Montagsspalte eingetragen.
+' ============================================================
+
+Private Sub SchreibeKalenderwochen( _
+    ByVal ws As Worksheet, _
+    ByVal targetRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal daysInMonth As Long)
+
+    Dim tag As Long
+    Dim d As Date
+    Dim col As Long
+
+    For tag = 1 To daysInMonth
+
+        d = DateSerial(jahr, monat, tag)
+        col = firstDayCol + tag - 1
+
+        If Weekday(d, vbMonday) = 1 Then
+            With ws.Cells(targetRow, col)
+                .Value = "KW " & WorksheetFunction.IsoWeekNum(d)
+                .Font.Bold = True
+                .HorizontalAlignment = xlCenter
+                .VerticalAlignment = xlCenter
+            End With
+        End If
+
+    Next tag
+
+End Sub
+
+
+' ============================================================
+' Statusformeln im Monatsblock setzen
+'
+' Zeile 1:
+'   "Alle Dienste abgedeckt?"
+'   Prüft je Werktag, ob im IT-Operations-Block mindestens
+'   ein Frühdienst und mindestens ein Spätdienst vorhanden ist.
+'
+' Zeile 2:
+'   "3 MA_IT vor Ort?"
+'   Prüft je Werktag, ob mindestens 3 Mitarbeitende aus
+'   IT-Operations vor Ort sind.
+'
+' Wochenenden und Feiertage bleiben leer.
+' ============================================================
+
+Private Sub SetzeStatusformelnMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal daysInMonth As Long, _
+    ByVal opsStartRow As Long, _
+    ByVal opsCount As Long, _
+    ByVal statusStartRow As Long)
+
+    Dim tag As Long
+    Dim col As Long
+    Dim d As Date
+    Dim opsRange As Range
+
+    Dim formulaDienste As String
+    Dim formulaVorOrt As String
+
+    If opsCount <= 0 Then Exit Sub
+
+    For tag = 1 To daysInMonth
+
+        d = DateSerial(jahr, monat, tag)
+        col = firstDayCol + tag - 1
+
+        ' Wochenende oder Feiertag: Statuszellen leer lassen
+        If Weekday(d, vbMonday) >= 6 Or IstFeiertag(d) Then
+
+            wsKal.Cells(statusStartRow, col).ClearContents
+            wsKal.Cells(statusStartRow + 1, col).ClearContents
+
+        Else
+
+            Set opsRange = wsKal.Range(wsKal.Cells(opsStartRow, col), _
+                                       wsKal.Cells(opsStartRow + opsCount - 1, col))
+
+            ' Alle Dienste abgedeckt?
+            formulaDienste = _
+                "=IF(AND(" & _
+                    "SUM(COUNTIF(" & opsRange.Address(False, False) & ",{""FD"",""FD/MW""}))>=1," & _
+                    "SUM(COUNTIF(" & opsRange.Address(False, False) & ",{""SD"",""SD/MW""}))>=1" & _
+                "),""" & ChrW(&H2713) & """,""" & ChrW(&H2717) & """)"
+
+            ' 3 MA_IT vor Ort?
+            formulaVorOrt = _
+                "=IF((" & opsCount & _
+                    "-SUM(COUNTIF(" & opsRange.Address(False, False) & ",{""GT"",""K"",""MW"",""SD/MW"",""Schu"",""SAD"",""DR"",""SU"",""UT""})))>=3," & _
+                    """" & ChrW(&H2713) & """,""" & ChrW(&H2717) & """)"
+
+            wsKal.Cells(statusStartRow, col).Formula2 = formulaDienste
+            wsKal.Cells(statusStartRow + 1, col).Formula2 = formulaVorOrt
+
+            With wsKal.Range(wsKal.Cells(statusStartRow, col), wsKal.Cells(statusStartRow + 1, col))
+                .Font.name = "Segoe UI Symbol"
+                .Font.Bold = True
+                .HorizontalAlignment = xlCenter
+                .VerticalAlignment = xlCenter
+            End With
+
+        End If
+
+    Next tag
+
+End Sub
+
+
+' ============================================================
+' Statistikformeln im Monatsblock setzen
+'
+' Hilfsspalten:
+'   AJ = Urlaub IST
+'   AK = MW
+'   AL = K
+'   AM = Sonstiges
+'   AN = Büro
+'   AO = Urlaub Soll
+' ============================================================
+
+Private Sub SetzeStatistikformelnMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal daysInMonth As Long, _
+    ByVal opsStartRow As Long, _
+    ByVal opsCount As Long, _
+    ByVal secStartRow As Long, _
+    ByVal secCount As Long, _
+    ByVal busStartRow As Long, _
+    ByVal busCount As Long)
+
+    Dim arbeitstageMonat As Long
+
+    arbeitstageMonat = ZaehleArbeitstageMonatOhneFeiertage(jahr, monat)
+
+    Call SetzeStatistikformelnFuerZeilenblock( _
+        wsKal:=wsKal, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth, _
+        startRow:=opsStartRow, _
+        rowCount:=opsCount, _
+        arbeitstageMonat:=arbeitstageMonat)
+
+    Call SetzeStatistikformelnFuerZeilenblock( _
+        wsKal:=wsKal, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth, _
+        startRow:=secStartRow, _
+        rowCount:=secCount, _
+        arbeitstageMonat:=arbeitstageMonat)
+
+    Call SetzeStatistikformelnFuerZeilenblock( _
+        wsKal:=wsKal, _
+        firstDayCol:=firstDayCol, _
+        daysInMonth:=daysInMonth, _
+        startRow:=busStartRow, _
+        rowCount:=busCount, _
+        arbeitstageMonat:=arbeitstageMonat)
+
+End Sub
+
+
+' ============================================================
+' Statistikformeln für einen Mitarbeiter-Zeilenblock setzen
+'
+' Büro-Logik:
+'   Büro = Arbeitstage ohne Wochenenden/Feiertage
+'          minus Urlaub
+'          minus MW
+'          minus K
+'          minus Sonstiges
+'          minus Gleittage
+'          minus weitere Nicht-Büro-Codes
+'
+' Als Büro verbleiben damit insbesondere:
+'   - leere Werktagszellen
+'   - FD
+'   - SD
+'   - 17h
+'
+' Urlaub-IST-Logik:
+'   UT  = 1 Tag
+'   UT5 = 0,5 Tage
+'
+' Gleittage GT/GT5 zählen ausdrücklich NICHT als Urlaub.
+' ============================================================
+
+Private Sub SetzeStatistikformelnFuerZeilenblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal firstDayCol As Long, _
+    ByVal daysInMonth As Long, _
+    ByVal startRow As Long, _
+    ByVal rowCount As Long, _
+    ByVal arbeitstageMonat As Long)
+
+    Dim r As Long
+    Dim lastDayColInMonth As Long
+    Dim rngTage As Range
+    Dim rngAdresse As String
+
+    If rowCount <= 0 Then Exit Sub
+
+    lastDayColInMonth = firstDayCol + daysInMonth - 1
+
+    For r = startRow To startRow + rowCount - 1
+
+        Set rngTage = wsKal.Range(wsKal.Cells(r, firstDayCol), _
+                                  wsKal.Cells(r, lastDayColInMonth))
+
+        rngAdresse = rngTage.Address(RowAbsolute:=False, ColumnAbsolute:=False)
+
+        ' AJ: Urlaub IST
+        wsKal.Cells(r, "AJ").Formula2 = _
+            "=COUNTIF(" & rngAdresse & ",""UT"")" & _
+            "+0.5*COUNTIF(" & rngAdresse & ",""UT5"")"
+
+        ' AK: Mobile Work
+        wsKal.Cells(r, "AK").Formula2 = _
+            "=COUNTIF(" & rngAdresse & ",""MW"")" & _
+            "+COUNTIF(" & rngAdresse & ",""FD/MW"")" & _
+            "+COUNTIF(" & rngAdresse & ",""SD/MW"")"
+
+        ' AL: Krankheit
+        wsKal.Cells(r, "AL").Formula2 = _
+            "=COUNTIF(" & rngAdresse & ",""K"")"
+
+        ' AM: Sonstiges
+        wsKal.Cells(r, "AM").Formula2 = _
+            "=COUNTIF(" & rngAdresse & ",""--"")"
+
+        ' AN: Büro
+        wsKal.Cells(r, "AN").Formula2 = _
+            "=" & arbeitstageMonat & _
+            "-AJ" & r & _
+            "-AK" & r & _
+            "-AL" & r & _
+            "-AM" & r & _
+            "-COUNTIF(" & rngAdresse & ",""GT"")" & _
+            "-0.5*COUNTIF(" & rngAdresse & ",""GT5"")" & _
+            "-COUNTIF(" & rngAdresse & ",""Schu"")" & _
+            "-COUNTIF(" & rngAdresse & ",""SAD"")" & _
+            "-COUNTIF(" & rngAdresse & ",""DR"")" & _
+            "-COUNTIF(" & rngAdresse & ",""SU"")"
+
+        ' AO: Urlaub Soll
+        wsKal.Cells(r, "AO").Value = VERTRGL_URLAUB
+
+        wsKal.Range(wsKal.Cells(r, "AJ"), wsKal.Cells(r, "AO")).NumberFormat = "0.0"
+
+    Next r
+
+End Sub
+
+
+' ============================================================
+' Arbeitstage eines Monats zählen
+'
+' Gezählt werden:
+'   Montag bis Freitag
+'
+' Nicht gezählt werden:
+'   Samstag
+'   Sonntag
+'   Feiertage aus tblFeiertage
+' ============================================================
+
+Private Function ZaehleArbeitstageMonatOhneFeiertage( _
+    ByVal jahr As Long, _
+    ByVal monat As Long) As Long
+
+    Dim d As Date
+    Dim monthStart As Date
+    Dim monthEnd As Date
+    Dim count As Long
+
+    monthStart = DateSerial(jahr, monat, 1)
+    monthEnd = DateSerial(jahr, monat + 1, 0)
+
+    count = 0
+
+    For d = monthStart To monthEnd
+
+        If Weekday(d, vbMonday) <= 5 Then
+            If Not IstFeiertag(d) Then
+                count = count + 1
+            End If
+        End If
+
+    Next d
+
+    ZaehleArbeitstageMonatOhneFeiertage = count
+
+End Function
+
+
+' ============================================================
+' Statuscode-Legende im Kalenderblatt erzeugen
+'
+' Die Legende steht links neben der Jahresstatistik.
+'
+' Spalten:
+'   C = Statuscode
+'   D = Beschreibung
+'
+' Zusätzlich wird ein benannter Bereich "StatusDropdownCodes"
+' auf die Statuscode-Spalte der Legende gesetzt.
+' Dieser Bereich dient anschließend als Quelle für die Dropdowns.
+' ============================================================
+
+Private Sub ErstelleStatuscodeLegende( _
+    ByVal wsKal As Worksheet, _
+    ByVal legendStartRow As Long)
+
+    Dim dictFarben As Object
+    Dim codes As Variant
+
+    Dim i As Long
+    Dim r As Long
+    Dim code As String
+
+    Dim titleRow As Long
+    Dim headerRow As Long
+    Dim firstDataRow As Long
+    Dim lastDataRow As Long
+
+    Dim rngLegende As Range
+    Dim rngCodes As Range
+
+    Set dictFarben = StatusFarbDictionary()
+    codes = StatusCodeListe()
+
+    titleRow = legendStartRow
+    headerRow = legendStartRow + 1
+    firstDataRow = legendStartRow + 2
+    lastDataRow = firstDataRow + UBound(codes) - LBound(codes)
+
+    ' Titel
+    With wsKal.Range(wsKal.Cells(titleRow, "C"), wsKal.Cells(titleRow, "D"))
+        .Merge
+        .Value = "Statuscodes"
+        .Font.Bold = True
+        .Font.Size = 12
+        .HorizontalAlignment = xlLeft
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Tabellenkopf
+    wsKal.Cells(headerRow, "C").Value = "Bedeutung"
+    wsKal.Cells(headerRow, "D").Value = "Code"
+
+
+    With wsKal.Range(wsKal.Cells(headerRow, "D"), wsKal.Cells(headerRow, "C"))
+        .Font.Bold = True
+        .Font.Italic = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Interior.Color = RGB(242, 242, 242)
+    End With
+
+    ' Statuscodes schreiben
+    For i = LBound(codes) To UBound(codes)
+
+        r = firstDataRow + i - LBound(codes)
+        code = CStr(codes(i))
+
+        wsKal.Cells(r, "D").Value = code
+        wsKal.Cells(r, "C").Value = StatusBeschreibung(code)
+
+        With wsKal.Cells(r, "D")
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .Font.Bold = True
+
+            If dictFarben.Exists(code) Then
+                .Interior.Color = CLng(dictFarben(code))
+            Else
+                .Interior.Color = RGB(242, 242, 242)
+            End If
+        End With
+
+        With wsKal.Cells(r, "C")
+            .HorizontalAlignment = xlLeft
+            .VerticalAlignment = xlCenter
+        End With
+
+    Next i
+
+    ' Rahmen / Formatierung
+    Set rngLegende = wsKal.Range(wsKal.Cells(headerRow, "D"), wsKal.Cells(lastDataRow, "D"))
+
+    With rngLegende
+        .Borders.LineStyle = xlContinuous
+        .Borders.Weight = xlThin
+        .VerticalAlignment = xlCenter
+    End With
+
+    'wsKal.Columns("C").ColumnWidth = 24
+    'wsKal.Columns("D").ColumnWidth = 24
+
+    ' Benannten Bereich für Dropdowns erzeugen
+    Set rngCodes = wsKal.Range(wsKal.Cells(firstDataRow, "D"), wsKal.Cells(lastDataRow, "D"))
+
+    On Error Resume Next
+    ThisWorkbook.names("StatusDropdownCodes").Delete
+    On Error GoTo 0
+
+    ThisWorkbook.names.Add _
+        name:="StatusDropdownCodes", _
+        RefersTo:="='" & wsKal.name & "'!" & rngCodes.Address
+
+End Sub
+
+
+' ============================================================
+' Dropdowns im gesamten Kalender setzen
+'
+' Version 2.0:
+'   Die Dropdowns verweisen nicht mehr auf das Parameterblatt,
+'   sondern auf die sichtbare Statuscode-Legende im Kalenderblatt.
+'
+' Quelle:
+'   Benannter Bereich "StatusDropdownCodes"
+'
+' Dropdowns werden nur gesetzt:
+'   - in Mitarbeiterzeilen
+'   - in Tageszellen
+'   - Montag bis Freitag
+'   - nicht an Feiertagen
+' ============================================================
+
+Private Sub SetzeDropdownsGesamterKalender( _
+    ByVal wsKal As Worksheet, _
+    ByVal wsMA As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal firstKalenderRow As Long, _
+    ByVal lastKalenderRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long)
+
+    Dim dictMitarbeiter As Object
+
+    Dim lastRowMA As Long
+    Dim rMA As Long
+
+    Dim monat As Long
+    Dim blockStartRow As Long
+    Dim blockEndRow As Long
+    Dim daysInMonth As Long
+
+    Dim r As Long
+    Dim tag As Long
+    Dim col As Long
+    Dim d As Date
+
+    Dim anzeigename As String
+    Dim nameValue As String
+
+    Set dictMitarbeiter = CreateObject("Scripting.Dictionary")
+
+    ' Mitarbeiter-Namen aus dem Mitarbeiterblatt sammeln
+    lastRowMA = wsMA.Cells(wsMA.Rows.count, "D").End(xlUp).Row
+
+    For rMA = 2 To lastRowMA
+
+        anzeigename = Trim(CStr(wsMA.Cells(rMA, "D").Value))
+
+        If anzeigename <> "" Then
+            If Not dictMitarbeiter.Exists(anzeigename) Then
+                dictMitarbeiter.Add anzeigename, True
+            End If
+        End If
+
+    Next rMA
+
+    ' Monatsblöcke durchlaufen
+    For monat = 1 To 12
+
+        blockStartRow = FindeMonatsblockStartzeile( _
+            wsKal:=wsKal, _
+            monat:=monat, _
+            jahr:=jahr, _
+            firstSearchRow:=firstKalenderRow, _
+            lastSearchRow:=lastKalenderRow)
+
+        If blockStartRow > 0 Then
+
+            blockEndRow = FindeMonatsblockEndzeile( _
+                wsKal:=wsKal, _
+                blockStartRow:=blockStartRow, _
+                lastSearchRow:=lastKalenderRow)
+
+            daysInMonth = Day(DateSerial(jahr, monat + 1, 0))
+
+            For r = blockStartRow + 1 To blockEndRow
+
+                nameValue = Trim(CStr(wsKal.Cells(r, "C").Value))
+
+                ' Nur echte Mitarbeiterzeilen erhalten Dropdowns.
+                If nameValue <> "" Then
+
+                    If dictMitarbeiter.Exists(nameValue) Then
+
+                        For tag = 1 To daysInMonth
+
+                            d = DateSerial(jahr, monat, tag)
+                            col = firstDayCol + tag - 1
+
+                            If Weekday(d, vbMonday) <= 5 And Not IstFeiertag(d) Then
+                                Call SetzeDropdownFuerZelle(wsKal.Cells(r, col))
+                            End If
+
+                        Next tag
+
+                    End If
+
+                End If
+
+            Next r
+
+        End If
+
+    Next monat
+
+End Sub
+
+
+' ============================================================
+' Dropdown für eine einzelne Kalenderzelle setzen
+' ============================================================
+
+Private Sub SetzeDropdownFuerZelle(ByVal rng As Range)
+
+    With rng.Validation
+        .Delete
+        .Add Type:=xlValidateList, _
+             AlertStyle:=xlValidAlertStop, _
+             Operator:=xlBetween, _
+             Formula1:="=StatusDropdownCodes"
+        .IgnoreBlank = True
+        .InCellDropdown = True
+        .ShowInput = True
+        .ShowError = True
+    End With
+
+    ' Diese Zelle ist im laufenden Betrieb editierbar.
+    rng.Locked = False
+
+End Sub
+
+
+' ============================================================
+' Kompakte Jahresstatistik am Ende des Kalenders erzeugen
+'
+' Sichtbarer Bereich:
+'   X:AH
+'
+' Spalten:
+'   X  = IST
+'   Y  = Soll
+'   Z  = offen
+'   AA = Abteilung / Mitarbeiter
+'   AE = MW
+'   AF = K
+'   AG = Sonst
+'   AH = Büro
+'
+' Die Spalten AB:AD bleiben bewusst leer,
+' damit lange Namen aus AA optisch weiterlaufen können,
+' ohne die Spaltenbreite des Kalenders zu verändern.
+'
+' Grundlage:
+'   - Mitarbeiterdaten aus Blatt "Mitarbeiter"
+'   - Monatszählungen aus Hilfsspalten AJ:AO
+' ============================================================
+
+Private Sub ErstelleJahresstatistik( _
+    ByVal wsKal As Worksheet, _
+    ByVal wsMA As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal statistikStartRow As Long)
+
+    Dim yearStart As Date
+    Dim yearEnd As Date
+
+    Dim lastRowMA As Long
+    Dim rMA As Long
+    Dim rStat As Long
+    Dim headerRow As Long
+
+    Dim anzeigename As String
+    Dim abteilung As String
+    Dim startVal As Variant
+    Dim endVal As Variant
+    Dim startDatum As Date
+    Dim endDatum As Date
+    Dim istAktivImJahr As Boolean
+
+    Dim deptList As Variant
+    Dim dept As Variant
+    Dim deptHeaderRow As Long
+
+    Dim firstStatCol As Long
+    Dim lastStatCol As Long
+
+    yearStart = DateSerial(jahr, 1, 1)
+    yearEnd = DateSerial(jahr, 12, 31)
+
+    lastRowMA = wsMA.Cells(wsMA.Rows.count, "D").End(xlUp).Row
+
+    ' Statistikbereich: X:AH
+    firstStatCol = wsKal.Range("X1").Column
+    lastStatCol = wsKal.Range("AH1").Column
+
+    deptList = KalenderAbteilungen()
+
+    ' Überschrift
+    With wsKal.Range(wsKal.Cells(statistikStartRow, firstStatCol), _
+                     wsKal.Cells(statistikStartRow, lastStatCol))
+        .Merge
+        .Value = "Jahresstatistik " & jahr
+        .Font.Bold = True
+        .Font.Size = 12
+        .HorizontalAlignment = xlLeft
+        .VerticalAlignment = xlCenter
+    End With
+
+    ' Tabellenkopf
+    headerRow = statistikStartRow + 2
+
+    wsKal.Cells(headerRow, "X").Value = "IST"
+    wsKal.Cells(headerRow, "Y").Value = "Soll"
+    wsKal.Cells(headerRow, "Z").Value = "offen"
+    wsKal.Cells(headerRow, "AA").Value = ""
+    wsKal.Cells(headerRow, "AE").Value = "MW"
+    wsKal.Cells(headerRow, "AF").Value = "K"
+    wsKal.Cells(headerRow, "AG").Value = "Sonst"
+    wsKal.Cells(headerRow, "AH").Value = "Büro"
+
+    With wsKal.Range(wsKal.Cells(headerRow, "X"), wsKal.Cells(headerRow, "AH"))
+        .Font.Bold = True
+        .Font.Italic = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).Weight = xlThin
+    End With
+
+    rStat = headerRow + 1
+
+    ' Mitarbeiter gruppiert nach Abteilung ausgeben
+    For Each dept In deptList
+
+        deptHeaderRow = rStat
+
+        With wsKal.Range(wsKal.Cells(deptHeaderRow, "X"), wsKal.Cells(deptHeaderRow, "AH"))
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).Weight = xlThin
+        End With
+
+        With wsKal.Cells(deptHeaderRow, "AA")
+            .Value = CStr(dept)
+            .Font.Italic = True
+            .Font.Color = RGB(128, 128, 128)
+            .HorizontalAlignment = xlLeft
+        End With
+
+        rStat = rStat + 1
+
+        For rMA = 2 To lastRowMA
+
+            anzeigename = Trim(CStr(wsMA.Cells(rMA, "D").Value))
+            abteilung = Trim(CStr(wsMA.Cells(rMA, "E").Value))
+            startVal = wsMA.Cells(rMA, "F").Value
+            endVal = wsMA.Cells(rMA, "G").Value
+
+            If anzeigename <> "" And abteilung = CStr(dept) Then
+
+                istAktivImJahr = False
+
+                If IsDate(startVal) Then
+
+                    startDatum = CDate(startVal)
+
+                    If IsDate(endVal) Then
+                        endDatum = CDate(endVal)
+                        istAktivImJahr = (startDatum <= yearEnd And endDatum >= yearStart)
+                    Else
+                        istAktivImJahr = (startDatum <= yearEnd)
+                    End If
+
+                End If
+
+                If istAktivImJahr Then
+
+                    ' Name
+                    wsKal.Cells(rStat, "AA").Value = anzeigename
+
+                    ' IST = Urlaub verbraucht aus AJ
+                    wsKal.Cells(rStat, "X").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AJ:$AJ)"
+
+                    ' Soll = monatlicher Urlaubsanspruch aus AO
+                    wsKal.Cells(rStat, "Y").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AO:$AO)"
+
+                    ' offen = Soll - IST
+                    wsKal.Cells(rStat, "Z").Formula2 = _
+                        "=Y" & rStat & "-X" & rStat
+
+                    ' MW aus AK
+                    wsKal.Cells(rStat, "AE").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AK:$AK)"
+
+                    ' K aus AL
+                    wsKal.Cells(rStat, "AF").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AL:$AL)"
+
+                    ' Sonst aus AM
+                    wsKal.Cells(rStat, "AG").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AM:$AM)"
+
+                    ' Büro aus AN
+                    wsKal.Cells(rStat, "AH").Formula2 = _
+                        "=SUMIF($C:$C,AA" & rStat & ",$AN:$AN)"
+
+                    rStat = rStat + 1
+
+                End If
+
+            End If
+
+        Next rMA
+
+        ' Kleine Leerzeile zwischen Abteilungen
+        rStat = rStat + 1
+
+    Next dept
+
+    ' Formatierung
+    If rStat > headerRow + 1 Then
+
+        ' Urlaubsspalten
+        With wsKal.Range(wsKal.Cells(headerRow + 1, "X"), wsKal.Cells(rStat - 1, "Z"))
+            .HorizontalAlignment = xlCenter
+            .NumberFormat = "0.0"
+        End With
+
+        ' Statistikspalten rechts
+        With wsKal.Range(wsKal.Cells(headerRow + 1, "AE"), wsKal.Cells(rStat - 1, "AH"))
+            .HorizontalAlignment = xlCenter
+            .NumberFormat = "0.0"
+        End With
+
+        ' Namen / Abteilungen
+        With wsKal.Range(wsKal.Cells(headerRow + 1, "AA"), wsKal.Cells(rStat - 1, "AA"))
+            .HorizontalAlignment = xlLeft
+            .VerticalAlignment = xlCenter
+        End With
+
+        ' Rahmen für den Statistikblock
+        With wsKal.Range(wsKal.Cells(headerRow, "X"), wsKal.Cells(rStat - 1, "AH"))
+            .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+            .Borders(xlInsideHorizontal).Weight = xlHairline
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        End With
+
+    End If
+
+End Sub
+
+
+' ============================================================
+' Anzahl Array-Einträge
+'
+' Gibt 0 zurück, wenn das Variant kein befülltes Array ist.
+' ============================================================
+
+Private Function AnzahlArrayEintraege(ByVal arr As Variant) As Long
+
+    On Error GoTo KeinArray
+
+    AnzahlArrayEintraege = UBound(arr) - LBound(arr) + 1
+    Exit Function
+
+KeinArray:
+    AnzahlArrayEintraege = 0
+
+End Function
+
+
+' ============================================================
+' String-Array alphabetisch sortieren
+' ============================================================
+
+Private Sub SortiereStringArray(ByRef arr() As String)
+
+    Dim i As Long
+    Dim j As Long
+    Dim tmp As String
+
+    For i = LBound(arr) To UBound(arr) - 1
+        For j = i + 1 To UBound(arr)
+            If LCase(arr(j)) < LCase(arr(i)) Then
+                tmp = arr(i)
+                arr(i) = arr(j)
+                arr(j) = tmp
+            End If
+        Next j
+    Next i
+
+End Sub
+
+
+' ============================================================
+' Dicken Außenrahmen setzen
+' ============================================================
+
+Private Sub SetzeDickenAussenrahmen(ByVal rng As Range)
+
+    With rng.Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+    With rng.Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+    With rng.Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+    With rng.Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+End Sub
+
+
+' ============================================================
+' Dezente Innenlinien setzen
+' ============================================================
+
+Private Sub SetzeInnenlinien(ByVal rng As Range)
+
+    With rng.Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+    End With
+
+    With rng.Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .Weight = xlThin
+    End With
+
+End Sub
+
+
+' ============================================================
+' Formatierungs-Spezial
+' ============================================================
+
+Private Sub FormatiereMonatsblockSpezial( _
+    ByVal wsKal As Worksheet, _
+    ByVal blockStartRow As Long, _
+    ByVal blockEndRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long, _
+    ByVal opsCount As Long, _
+    ByVal secCount As Long, _
+    ByVal busCount As Long)
+
+    Dim weekdayRow As Long
+    Dim opsStartRow As Long
+    Dim opsEndRow As Long
+    Dim blankAfterOpsRow As Long
+    Dim secStartRow As Long
+    Dim secEndRow As Long
+    Dim blankAfterSecRow As Long
+    Dim statusStartRow As Long
+    Dim statusEndRow As Long
+    Dim blankAfterStatusRow As Long
+    Dim busStartRow As Long
+    Dim busEndRow As Long
+    Dim kwRow As Long
+
+    ' Zeilenpositionen innerhalb des Monatsblocks berechnen
+    weekdayRow = blockStartRow
+
+    opsStartRow = weekdayRow + 1
+    opsEndRow = opsStartRow + opsCount - 1
+    blankAfterOpsRow = opsEndRow + 1
+
+    secStartRow = blankAfterOpsRow + 1
+    secEndRow = secStartRow + secCount - 1
+    blankAfterSecRow = secEndRow + 1
+
+    statusStartRow = blankAfterSecRow + 1
+    statusEndRow = statusStartRow + 1
+    blankAfterStatusRow = statusEndRow + 1
+
+    busStartRow = blankAfterStatusRow + 1
+    busEndRow = busStartRow + busCount - 1
+
+    kwRow = blockEndRow
+
+    ' 1. Wochentagszeile ohne vertikale Zwischenstriche
+    With wsKal.Range(wsKal.Cells(weekdayRow, firstDayCol - 2), wsKal.Cells(weekdayRow, lastDayCol))
+        .Borders(xlInsideVertical).LineStyle = xlNone
+    End With
+
+    ' 2. Kalenderwochenzeile ohne vertikale Zwischenstriche
+    With wsKal.Range(wsKal.Cells(kwRow, firstDayCol - 2), wsKal.Cells(kwRow, lastDayCol))
+        .Borders(xlInsideVertical).LineStyle = xlNone
+    End With
+
+    ' 3. Leerzeilen ohne vertikale Zwischenstriche
+    Call EntferneVertikaleInnenlinienInZeile(wsKal, blankAfterOpsRow, firstDayCol - 2, lastDayCol)
+    Call EntferneVertikaleInnenlinienInZeile(wsKal, blankAfterSecRow, firstDayCol - 2, lastDayCol)
+    Call EntferneVertikaleInnenlinienInZeile(wsKal, blankAfterStatusRow, firstDayCol - 2, lastDayCol)
+
+    ' 4. Abteilungsspalte B innerhalb der Abteilungsblöcke
+    '    ohne horizontale Zwischenstriche
+    If opsCount > 1 Then
+        wsKal.Range(wsKal.Cells(opsStartRow, 2), wsKal.Cells(opsEndRow, 2)) _
+             .Borders(xlInsideHorizontal).LineStyle = xlNone
+    End If
+
+    If secCount > 1 Then
+        wsKal.Range(wsKal.Cells(secStartRow, 2), wsKal.Cells(secEndRow, 2)) _
+             .Borders(xlInsideHorizontal).LineStyle = xlNone
+    End If
+
+    If busCount > 1 Then
+        wsKal.Range(wsKal.Cells(busStartRow, 2), wsKal.Cells(busEndRow, 2)) _
+             .Borders(xlInsideHorizontal).LineStyle = xlNone
+    End If
+
+    ' 5. Status-/Zwischenbereich in Spalte B:
+    '    Keine horizontalen Linien zwischen IT-Compliance und
+    '    Business Transformation.
+    With wsKal.Range(wsKal.Cells(blankAfterSecRow, 2), wsKal.Cells(blankAfterStatusRow, 2))
+        .Borders(xlInsideHorizontal).LineStyle = xlNone
+    End With
+
+End Sub
+
+
+' ============================================================
+' Vertikale Innenlinien in einer Zeile entfernen
+' ============================================================
+
+Private Sub EntferneVertikaleInnenlinienInZeile( _
+    ByVal wsKal As Worksheet, _
+    ByVal targetRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long)
+
+    With wsKal.Range(wsKal.Cells(targetRow, firstDayCol), wsKal.Cells(targetRow, lastDayCol))
+        .Borders(xlInsideVertical).LineStyle = xlNone
+    End With
+
+End Sub
+
+
+' ============================================================
+' Nicht verwendete Tagesspalten optisch beruhigen
+'
+' Bei Monaten mit weniger als 31 Tagen werden die restlichen
+' Tagesspalten zwar benötigt, damit die Monatsblöcke gleich breit
+' bleiben, sie sollen aber keine störenden inneren Linien zeigen.
+'
+' Wirkung:
+'   - Inhalte bleiben leer
+'   - Datenüberprüfung wird entfernt
+'   - Füllung wird entfernt
+'   - innere Linien werden entfernt
+'   - rechter Außenrahmen des Monatsblocks bleibt erhalten
+'   - oberer und unterer Außenrahmen bleiben erhalten
+' ============================================================
+
+Private Sub FormatiereNichtVerwendeteTagesspalten( _
+    ByVal wsKal As Worksheet, _
+    ByVal blockStartRow As Long, _
+    ByVal blockEndRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long, _
+    ByVal daysInMonth As Long)
+
+    Dim firstUnusedCol As Long
+    Dim rngUnused As Range
+
+    If daysInMonth >= 31 Then Exit Sub
+
+    firstUnusedCol = firstDayCol + daysInMonth
+
+    Set rngUnused = wsKal.Range(wsKal.Cells(blockStartRow, firstUnusedCol), _
+                                wsKal.Cells(blockEndRow, lastDayCol))
+
+    With rngUnused
+        .ClearContents
+
+        On Error Resume Next
+        .Validation.Delete
+        On Error GoTo 0
+
+        .Interior.Pattern = xlNone
+        .Borders.LineStyle = xlNone
+    End With
+
+    ' Rechten Außenrahmen des Monatsblocks wiederherstellen
+    With wsKal.Range(wsKal.Cells(blockStartRow, lastDayCol), _
+                     wsKal.Cells(blockEndRow, lastDayCol)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+    ' Oberen Außenrahmen im ungenutzten Bereich wiederherstellen
+    With wsKal.Range(wsKal.Cells(blockStartRow, firstUnusedCol), _
+                     wsKal.Cells(blockStartRow, lastDayCol)).Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+    ' Unteren Außenrahmen im ungenutzten Bereich wiederherstellen
+    With wsKal.Range(wsKal.Cells(blockEndRow, firstUnusedCol), _
+                     wsKal.Cells(blockEndRow, lastDayCol)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .Weight = xlThick
+    End With
+
+End Sub
+
+
+' ============================================================
+' Wochenenden im Monatsblock einfärben
+'
+' Samstag: RGB(255, 255, 204)
+' Sonntag: RGB(255, 204, 0)
+'
+' Es wird jeweils die komplette Tagesspalte innerhalb
+' des Monatsblocks eingefärbt.
+' ============================================================
+
+Private Sub FaerbeWochenendenMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal blockStartRow As Long, _
+    ByVal blockEndRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal daysInMonth As Long)
+
+    Dim tag As Long
+    Dim d As Date
+    Dim col As Long
+    Dim rngTagesspalte As Range
+
+    For tag = 1 To daysInMonth
+
+        d = DateSerial(jahr, monat, tag)
+        col = firstDayCol + tag - 1
+
+        Set rngTagesspalte = wsKal.Range(wsKal.Cells(blockStartRow, col), _
+                                         wsKal.Cells(blockEndRow, col))
+
+        Select Case Weekday(d, vbMonday)
+
+            Case 6
+                ' Samstag
+                rngTagesspalte.Interior.Color = RGB(255, 255, 204)
+
+            Case 7
+                ' Sonntag
+                rngTagesspalte.Interior.Color = RGB(255, 204, 0)
+
+        End Select
+
+    Next tag
+
+End Sub
+
+
+' ============================================================
+' Feiertage im Monatsblock markieren
+'
+' Quelle:
+'   Blatt "Parameter"
+'   Tabelle "tblFeiertage"
+'   Spalten:
+'       Feiertag
+'       Abkuerzung oder Abkürzung
+'       Datum
+'
+' Wirkung:
+'   - Feiertage werden nur markiert, wenn sie auf Mo-Fr fallen
+'   - Feiertagsspalte wird bis zur letzten Abteilungszeile gefärbt
+'   - Wochentag in der Kopfzeile wird durch Feiertags-Abkürzung ersetzt
+'   - Kalenderwochenzeile bleibt ungefärbt
+' ============================================================
+
+Private Sub MarkiereFeiertageMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal blockStartRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal busStartRow As Long, _
+    ByVal busCount As Long)
+
+    Dim wsParam As Worksheet
+    Dim tbl As ListObject
+
+    Dim datumCol As Long
+    Dim abkCol As Long
+
+    Dim i As Long
+    Dim feiertagsDatum As Date
+    Dim abkuerzung As String
+
+    Dim col As Long
+    Dim letzteAbteilungsZeile As Long
+    Dim rngFeiertag As Range
+
+    If busCount <= 0 Then Exit Sub
+
+    letzteAbteilungsZeile = busStartRow + busCount - 1
+
+    Set wsParam = ThisWorkbook.Worksheets("Parameter")
+    Set tbl = wsParam.ListObjects("tblFeiertage")
+
+    datumCol = tbl.ListColumns("Datum").Index
+    abkCol = HoleTabellenspaltenIndex(tbl, "Abkuerzung")
+
+    If abkCol = 0 Then
+        abkCol = HoleTabellenspaltenIndex(tbl, "Abkürzung")
+    End If
+
+    If abkCol = 0 Then
+        MsgBox "In tblFeiertage fehlt die Spalte 'Abkuerzung' bzw. 'Abkürzung'.", vbExclamation
+        Exit Sub
+    End If
+
+    For i = 1 To tbl.DataBodyRange.Rows.count
+
+        If IsDate(tbl.DataBodyRange.Cells(i, datumCol).Value) Then
+
+            feiertagsDatum = CDate(tbl.DataBodyRange.Cells(i, datumCol).Value)
+
+            If Year(feiertagsDatum) = jahr And Month(feiertagsDatum) = monat Then
+
+                ' Feiertage nur markieren, wenn sie auf Montag bis Freitag fallen
+                If Weekday(feiertagsDatum, vbMonday) <= 5 Then
+
+                    abkuerzung = Trim(CStr(tbl.DataBodyRange.Cells(i, abkCol).Value))
+                    col = firstDayCol + Day(feiertagsDatum) - 1
+
+                    ' Feiertagsspalte nur bis zur letzten Abteilungszeile einfärben
+                    Set rngFeiertag = wsKal.Range(wsKal.Cells(blockStartRow, col), _
+                                                  wsKal.Cells(letzteAbteilungsZeile, col))
+
+                    rngFeiertag.Interior.Color = RGB(255, 193, 193)
+
+                    ' In der Wochentagszeile die Abkürzung setzen
+                    With wsKal.Cells(blockStartRow, col)
+                        .Value = abkuerzung
+                        .Font.Color = RGB(192, 0, 0)
+                        .Font.Bold = False
+                        .HorizontalAlignment = xlCenter
+                        .VerticalAlignment = xlCenter
+                    End With
+
+                End If
+
+            End If
+
+        End If
+
+    Next i
+
+End Sub
+
+
+' ============================================================
+' Status-Farbregeln global für den Kalenderbereich setzen
+'
+' Version 2.0:
+'   Die Statuscodes und Farben werden nicht mehr aus tblStatus
+'   im Parameterblatt gelesen, sondern vollständig aus dem
+'   modulweiten StatusFarbDictionary erzeugt.
+' ============================================================
+
+Private Sub SetzeStatusFarbregelnKalenderbereich( _
+    ByVal wsKal As Worksheet, _
+    ByVal firstRow As Long, _
+    ByVal lastRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long)
+
+    Dim rngZiel As Range
+    Dim fc As FormatCondition
+
+    Dim dictFarben As Object
+    Dim keys As Variant
+
+    Dim i As Long
+    Dim code As String
+    Dim farbeRGB As Long
+
+    Dim topLeftAddress As String
+
+    If lastRow < firstRow Then Exit Sub
+
+    Set rngZiel = wsKal.Range(wsKal.Cells(firstRow, firstDayCol), _
+                              wsKal.Cells(lastRow, lastDayCol))
+
+    ' Bestehende bedingte Formatierungen im Tagesbereich löschen,
+    ' damit beim erneuten Aufbau keine Regelduplikate entstehen.
+    rngZiel.FormatConditions.Delete
+
+    Set dictFarben = StatusFarbDictionary()
+    keys = dictFarben.keys
+
+    topLeftAddress = rngZiel.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+
+    For i = LBound(keys) To UBound(keys)
+
+        code = CStr(keys(i))
+        farbeRGB = CLng(dictFarben(code))
+
+        Set fc = rngZiel.FormatConditions.Add( _
+            Type:=xlExpression, _
+            Formula1:="=" & topLeftAddress & "=""" & code & """")
+
+        With fc
+            .Interior.Color = farbeRGB
+            .Font.Color = RGB(0, 0, 0)
+            .StopIfTrue = False
+        End With
+
+    Next i
+
+End Sub
+
+
+' ============================================================
+' Ferien im Monatsblock markieren
+'
+' Quelle:
+'   Blatt "Parameter"
+'   Tabelle "tblFerien"
+'   Spalten:
+'       Ferien
+'       von
+'       bis
+'
+' Wirkung:
+'   - Ferienzeitraum wird in der Zeile oberhalb des Monatsblocks
+'     gelb eingefärbt, verbunden und beschriftet.
+'   - Wochentagszellen innerhalb der Ferien werden gelb eingefärbt,
+'     sofern sie weder Wochenende noch Feiertag sind.
+' ============================================================
+
+Private Sub MarkiereFerienMonatsblock( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal monat As Long, _
+    ByVal blockStartRow As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal daysInMonth As Long)
+
+    Dim wsParam As Worksheet
+    Dim tbl As ListObject
+
+    Dim ferienCol As Long
+    Dim vonCol As Long
+    Dim bisCol As Long
+
+    Dim i As Long
+    Dim ferienName As String
+    Dim vonDatum As Date
+    Dim bisDatum As Date
+
+    Dim monthStart As Date
+    Dim monthEnd As Date
+    Dim overlapStart As Date
+    Dim overlapEnd As Date
+
+    Dim startCol As Long
+    Dim endCol As Long
+    Dim bannerRow As Long
+
+    Dim d As Date
+    Dim tag As Long
+    Dim col As Long
+
+    Dim rngBanner As Range
+
+    monthStart = DateSerial(jahr, monat, 1)
+    monthEnd = DateSerial(jahr, monat + 1, 0)
+
+    bannerRow = blockStartRow - 1
+
+    Set wsParam = ThisWorkbook.Worksheets("Parameter")
+    Set tbl = wsParam.ListObjects("tblFerien")
+
+    ferienCol = tbl.ListColumns("Ferien").Index
+    vonCol = tbl.ListColumns("von").Index
+    bisCol = tbl.ListColumns("bis").Index
+
+    For i = 1 To tbl.DataBodyRange.Rows.count
+
+        If IsDate(tbl.DataBodyRange.Cells(i, vonCol).Value) And _
+           IsDate(tbl.DataBodyRange.Cells(i, bisCol).Value) Then
+
+            ferienName = Trim(CStr(tbl.DataBodyRange.Cells(i, ferienCol).Value))
+            vonDatum = CDate(tbl.DataBodyRange.Cells(i, vonCol).Value)
+            bisDatum = CDate(tbl.DataBodyRange.Cells(i, bisCol).Value)
+
+            ' Prüfen, ob Ferienzeitraum den aktuellen Monat berührt
+            If vonDatum <= monthEnd And bisDatum >= monthStart Then
+
+                If vonDatum < monthStart Then
+                    overlapStart = monthStart
+                Else
+                    overlapStart = vonDatum
+                End If
+
+                If bisDatum > monthEnd Then
+                    overlapEnd = monthEnd
+                Else
+                    overlapEnd = bisDatum
+                End If
+
+                startCol = firstDayCol + Day(overlapStart) - 1
+                endCol = firstDayCol + Day(overlapEnd) - 1
+
+                ' Ferien-Banner oberhalb des Monatsblocks
+                Set rngBanner = wsKal.Range(wsKal.Cells(bannerRow, startCol), _
+                                            wsKal.Cells(bannerRow, endCol))
+
+                With rngBanner
+                    .UnMerge
+                    .Merge
+                    .Interior.Color = RGB(255, 255, 0)
+                    .Value = ferienName & ": " & _
+                             Format(vonDatum, "dd.mm.") & " bis " & _
+                             Format(bisDatum, "dd.mm.yyyy")
+                    .HorizontalAlignment = xlCenter
+                    .VerticalAlignment = xlCenter
+                    .Font.Bold = True
+                    .Font.Color = RGB(192, 0, 0)
+                End With
+
+                ' Wochentagszeile innerhalb der Ferien gelb färben,
+                ' aber nur bei normalen Wochentagen:
+                ' nicht Samstag, nicht Sonntag, nicht Feiertag
+                For tag = Day(overlapStart) To Day(overlapEnd)
+
+                    d = DateSerial(jahr, monat, tag)
+                    col = firstDayCol + tag - 1
+
+                    If Weekday(d, vbMonday) <= 5 Then
+                        If Not IstFeiertag(d) Then
+                            wsKal.Cells(blockStartRow, col).Interior.Color = RGB(255, 255, 0)
+                        End If
+                    End If
+
+                Next tag
+
+            End If
+
+        End If
+
+    Next i
+
+End Sub
+
+
+' ============================================================
+' Prüft, ob ein Datum in tblFeiertage enthalten ist
+' ============================================================
+
+Private Function IstFeiertag(ByVal pruefDatum As Date) As Boolean
+
+    Dim wsParam As Worksheet
+    Dim tbl As ListObject
+    Dim datumCol As Long
+    Dim i As Long
+    Dim d As Date
+
+    On Error GoTo Fehler
+
+    Set wsParam = ThisWorkbook.Worksheets("Parameter")
+    Set tbl = wsParam.ListObjects("tblFeiertage")
+
+    datumCol = tbl.ListColumns("Datum").Index
+
+    For i = 1 To tbl.DataBodyRange.Rows.count
+
+        If IsDate(tbl.DataBodyRange.Cells(i, datumCol).Value) Then
+            d = CDate(tbl.DataBodyRange.Cells(i, datumCol).Value)
+
+            If CLng(d) = CLng(pruefDatum) Then
+                IstFeiertag = True
+                Exit Function
+            End If
+        End If
+
+    Next i
+
+    IstFeiertag = False
+    Exit Function
+
+Fehler:
+    IstFeiertag = False
+
+End Function
+
+
+' ============================================================
+' Mapping-Dictionaries aus tblMapping laden
+'
+' Voraussetzung:
+'   Blatt "Parameter"
+'   Definierter Name "tblMapping"
+'   Spalten:
+'       SpeicherCode
+'       AnzeigeCode
+'
+' Bedeutung:
+'   X = leere Zelle / Office-Tag
+'   Z = -- / Sonstiges
+' ============================================================
+
+Private Sub LadeMappingDictionaries( _
+    ByRef dictAnzeigeToSpeicher As Object, _
+    ByRef dictSpeicherToAnzeige As Object)
+
+    Dim rngMap As Range
+    Dim i As Long
+
+    Dim speicherCode As String
+    Dim anzeigeCode As String
+
+    Set dictAnzeigeToSpeicher = CreateObject("Scripting.Dictionary")
+    Set dictSpeicherToAnzeige = CreateObject("Scripting.Dictionary")
+
+    On Error Resume Next
+    Set rngMap = ThisWorkbook.names("tblMapping").RefersToRange
+    On Error GoTo 0
+
+    If rngMap Is Nothing Then
+        MsgBox "Der definierte Name 'tblMapping' wurde nicht gefunden.", vbExclamation
+        Exit Sub
+    End If
+
+    For i = 1 To rngMap.Rows.count
+
+        speicherCode = Trim(CStr(rngMap.Cells(i, 1).Value))
+        anzeigeCode = Trim(CStr(rngMap.Cells(i, 2).Value))
+
+        If speicherCode <> "" Then
+
+            ' SpeicherCode -> AnzeigeCode
+            If Not dictSpeicherToAnzeige.Exists(speicherCode) Then
+                dictSpeicherToAnzeige.Add speicherCode, anzeigeCode
+            End If
+
+            ' AnzeigeCode -> SpeicherCode
+            If Not dictAnzeigeToSpeicher.Exists(anzeigeCode) Then
+                dictAnzeigeToSpeicher.Add anzeigeCode, speicherCode
+            End If
+
+        End If
+
+    Next i
+
+End Sub
+
+
+' ============================================================
+' Bestehende Kalendereinträge sichern
+'
+' Struktur:
+'   dictKalenderSpeicher(Anzeigename)(Monat) = Monatsvektor
+'
+' Beispiel:
+'   dictKalenderSpeicher("Alpha, Anna")(1) = "XXACB..."
+'
+' Ein Monatsvektor hat exakt so viele Zeichen wie der Monat Tage hat.
+' Position 1 = Tag 1, Position 2 = Tag 2 usw.
+' ============================================================
+
+Private Function SichereKalendereintraege( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long, _
+    ByVal dictAnzeigeToSpeicher As Object) As Object
+
+    Dim dictKalenderSpeicher As Object
+    Dim r As Long
+    Dim c As Long
+
+    Dim lastSearchRow As Long
+    Dim currentMonth As Long
+    Dim daysInMonth As Long
+
+    Dim blockStartRow As Long
+    Dim blockEndRow As Long
+
+    Dim nameValue As String
+    Dim cellValue As String
+    Dim speicherCode As String
+
+    Dim monatDict As Object
+    Dim monatsVektor As String
+
+    Dim tag As Long
+
+    Set dictKalenderSpeicher = CreateObject("Scripting.Dictionary")
+
+    lastSearchRow = wsKal.Cells(wsKal.Rows.count, "A").End(xlUp).Row
+
+    If lastSearchRow < 5 Then
+        Set SichereKalendereintraege = dictKalenderSpeicher
+        Exit Function
+    End If
+
+    For currentMonth = 1 To 12
+
+        blockStartRow = FindeMonatsblockStartzeile(wsKal, currentMonth, jahr, 5, lastSearchRow)
+
+        If blockStartRow > 0 Then
+
+            blockEndRow = FindeMonatsblockEndzeile(wsKal, blockStartRow, lastSearchRow)
+            daysInMonth = Day(DateSerial(jahr, currentMonth + 1, 0))
+
+            For r = blockStartRow + 1 To blockEndRow
+
+                nameValue = Trim(CStr(wsKal.Cells(r, "C").Value))
+
+                ' Nur Mitarbeiterzeilen sichern:
+                ' - Name in Spalte C vorhanden
+                ' - mindestens eine Tageszelle mit Dropdown oder Inhalt vorhanden
+                If nameValue <> "" Then
+
+                    If ZeileHatKalenderrelevanz(wsKal, r, firstDayCol, firstDayCol + daysInMonth - 1) Then
+
+                        monatsVektor = ""
+
+                        For tag = 1 To daysInMonth
+
+                            c = firstDayCol + tag - 1
+                            cellValue = Trim(CStr(wsKal.Cells(r, c).Value))
+
+                            If cellValue = "" Then
+                                speicherCode = "X"
+                            ElseIf Not dictAnzeigeToSpeicher Is Nothing Then
+                                If dictAnzeigeToSpeicher.Exists(cellValue) Then
+                                    speicherCode = CStr(dictAnzeigeToSpeicher(cellValue))
+                                Else
+                                    speicherCode = "X"
+                                End If
+                            Else
+                                speicherCode = "X"
+                            End If
+
+                            monatsVektor = monatsVektor & speicherCode
+
+                        Next tag
+
+                        If Not dictKalenderSpeicher.Exists(nameValue) Then
+                            Set monatDict = CreateObject("Scripting.Dictionary")
+                            dictKalenderSpeicher.Add nameValue, monatDict
+                        Else
+                            Set monatDict = dictKalenderSpeicher(nameValue)
+                        End If
+
+                        monatDict(currentMonth) = monatsVektor
+
+                    End If
+
+                End If
+
+            Next r
+
+        End If
+
+    Next currentMonth
+
+    Debug.Print "Kalendereinträge gesichert: " & dictKalenderSpeicher.count & " Mitarbeiter"
+
+    Set SichereKalendereintraege = dictKalenderSpeicher
+
+End Function
+
+
+' ============================================================
+' Gesicherte Kalendereinträge zurückschreiben
+'
+' X wird nicht sichtbar geschrieben:
+'   X -> Zelle bleibt leer
+'
+' Alle anderen SpeicherCodes werden über tblMapping zurückübersetzt:
+'   A -> FD
+'   B -> SD
+'   ...
+'   Z -> --
+' ============================================================
+
+Private Sub SchreibeKalendereintraegeZurueck( _
+    ByVal wsKal As Worksheet, _
+    ByVal jahr As Long, _
+    ByVal firstDayCol As Long, _
+    ByVal lastDayCol As Long, _
+    ByVal dictKalenderSpeicher As Object, _
+    ByVal dictSpeicherToAnzeige As Object)
+
+    Dim r As Long
+    Dim c As Long
+
+    Dim lastSearchRow As Long
+    Dim currentMonth As Long
+    Dim daysInMonth As Long
+
+    Dim blockStartRow As Long
+    Dim blockEndRow As Long
+
+    Dim nameValue As String
+    Dim monatDict As Object
+    Dim monatsVektor As String
+
+    Dim tag As Long
+    Dim speicherCode As String
+    Dim anzeigeCode As String
+
+    If dictKalenderSpeicher Is Nothing Then Exit Sub
+
+    lastSearchRow = wsKal.Cells(wsKal.Rows.count, "A").End(xlUp).Row
+
+    If lastSearchRow < 5 Then Exit Sub
+
+    For currentMonth = 1 To 12
+
+        blockStartRow = FindeMonatsblockStartzeile(wsKal, currentMonth, jahr, 5, lastSearchRow)
+
+        If blockStartRow > 0 Then
+
+            blockEndRow = FindeMonatsblockEndzeile(wsKal, blockStartRow, lastSearchRow)
+            daysInMonth = Day(DateSerial(jahr, currentMonth + 1, 0))
+
+            For r = blockStartRow + 1 To blockEndRow
+
+                nameValue = Trim(CStr(wsKal.Cells(r, "C").Value))
+
+                If nameValue <> "" Then
+
+                    If dictKalenderSpeicher.Exists(nameValue) Then
+
+                        Set monatDict = dictKalenderSpeicher(nameValue)
+
+                        If monatDict.Exists(currentMonth) Then
+
+                            monatsVektor = CStr(monatDict(currentMonth))
+
+                            For tag = 1 To daysInMonth
+
+                                If tag <= Len(monatsVektor) Then
+
+                                    speicherCode = Mid(monatsVektor, tag, 1)
+                                    c = firstDayCol + tag - 1
+
+                                    If speicherCode = "X" Then
+                                        wsKal.Cells(r, c).ClearContents
+                                    ElseIf Not dictSpeicherToAnzeige Is Nothing Then
+                                        If dictSpeicherToAnzeige.Exists(speicherCode) Then
+                                            anzeigeCode = CStr(dictSpeicherToAnzeige(speicherCode))
+                                            wsKal.Cells(r, c).Value = anzeigeCode
+                                        Else
+                                            wsKal.Cells(r, c).ClearContents
+                                        End If
+                                    Else
+                                        wsKal.Cells(r, c).ClearContents
+                                    End If
+
+                                End If
+
+                            Next tag
+
+                        End If
+
+                    End If
+
+                End If
+
+            Next r
+
+        End If
+
+    Next currentMonth
+
+    Debug.Print "Kalendereinträge zurückgeschrieben."
+
+End Sub
+
+
+' ============================================================
+' Monatsblock-Startzeile finden
+'
+' Sucht in Spalte A nach dem verbundenen Monatsnamen.
+' ============================================================
+
+Private Function FindeMonatsblockStartzeile( _
+    ByVal wsKal As Worksheet, _
+    ByVal monat As Long, _
+    ByVal jahr As Long, _
+    ByVal firstSearchRow As Long, _
+    ByVal lastSearchRow As Long) As Long
+
+    Dim r As Long
+    Dim gesuchterMonat As String
+    Dim cellText As String
+
+    gesuchterMonat = LCase(Format(DateSerial(jahr, monat, 1), "MMMM"))
+
+    For r = firstSearchRow To lastSearchRow
+
+        cellText = LCase(Trim(CStr(wsKal.Cells(r, "A").Value)))
+
+        If cellText = gesuchterMonat Then
+            FindeMonatsblockStartzeile = r
+            Exit Function
+        End If
+
+    Next r
+
+    FindeMonatsblockStartzeile = 0
+
+End Function
+
+
+' ============================================================
+' Monatsblock-Endzeile finden
+'
+' Da der Monatsname in Spalte A als verbundener Bereich steht,
+' kann die Endzeile aus dem MergeArea-Bereich gelesen werden.
+' ============================================================
+
+Private Function FindeMonatsblockEndzeile( _
+    ByVal wsKal As Worksheet, _
+    ByVal blockStartRow As Long, _
+    ByVal lastSearchRow As Long) As Long
+
+    If wsKal.Cells(blockStartRow, "A").MergeCells Then
+        With wsKal.Cells(blockStartRow, "A").MergeArea
+            FindeMonatsblockEndzeile = .Row + .Rows.count - 1
+        End With
+    Else
+        FindeMonatsblockEndzeile = blockStartRow
+    End If
+
+End Function
+
+
+' ============================================================
+' Prüft, ob eine Zeile kalenderrelevante Tageszellen enthält.
+'
+' Für Version 2.0:
+'   Eine Zeile gilt als relevant, wenn im Tagesbereich mindestens
+'   eine Zelle Datenüberprüfung besitzt oder einen Eintrag enthält.
+'
+' Dadurch werden Statuszeilen, Leerzeilen und KW-Zeilen ignoriert.
+' ============================================================
+
+Private Function ZeileHatKalenderrelevanz( _
+    ByVal wsKal As Worksheet, _
+    ByVal targetRow As Long, _
+    ByVal firstCol As Long, _
+    ByVal lastCol As Long) As Boolean
+
+    Dim c As Long
+
+    For c = firstCol To lastCol
+
+        If ZelleHatDatenueberpruefung(wsKal.Cells(targetRow, c)) Then
+            ZeileHatKalenderrelevanz = True
+            Exit Function
+        End If
+
+        If Trim(CStr(wsKal.Cells(targetRow, c).Value)) <> "" Then
+            ZeileHatKalenderrelevanz = True
+            Exit Function
+        End If
+
+    Next c
+
+    ZeileHatKalenderrelevanz = False
+
+End Function
+
+
+' ============================================================
+' Prüft, ob eine Zelle Datenüberprüfung besitzt
+' ============================================================
+
+Private Function ZelleHatDatenueberpruefung(ByVal rng As Range) As Boolean
+
+    On Error GoTo KeineValidation
+
+    If rng.Validation.Type = xlValidateList Then
+        ZelleHatDatenueberpruefung = True
+        Exit Function
+    End If
+
+KeineValidation:
+    ZelleHatDatenueberpruefung = False
+
+End Function
+
+
+' ============================================================
+' Hilfsfunktion:
+' Gibt den Index einer ListObject-Spalte zurück.
+' Falls die Spalte nicht existiert, wird 0 zurückgegeben.
+' ============================================================
+
+Private Function HoleTabellenspaltenIndex( _
+    ByVal tbl As ListObject, _
+    ByVal spaltenName As String) As Long
+
+    On Error GoTo NichtGefunden
+
+    HoleTabellenspaltenIndex = tbl.ListColumns(spaltenName).Index
+    Exit Function
+
+NichtGefunden:
+    HoleTabellenspaltenIndex = 0
+
+End Function
+
+
+' ============================================================
+' Überschriften für die ausgeblendeten Hilfsspalten
+'
+' Diese Überschriften dienen der Nachvollziehbarkeit,
+' falls die Hilfsspalten eingeblendet werden.
+' ============================================================
+
+Private Sub SchreibeHilfsspaltenUeberschriften(ByVal wsKal As Worksheet)
+
+    wsKal.Range("AJ4").Value = "Urlaub IST"
+    wsKal.Range("AK4").Value = "MW"
+    wsKal.Range("AL4").Value = "K"
+    wsKal.Range("AM4").Value = "Sonst"
+    wsKal.Range("AN4").Value = "Büro"
+    wsKal.Range("AO4").Value = "Urlaub Soll"
+
+    With wsKal.Range("AJ4:AO4")
+        .Font.Bold = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .Interior.Color = RGB(242, 242, 242)
+        .Borders.LineStyle = xlContinuous
+    End With
+
+End Sub
+
+
+' ============================================================
+' Blattschutz ausschalten
+'
+' Wird zu Beginn des Neuaufbaus aufgerufen, damit das Makro
+' den Kalender vollständig neu erzeugen kann.
+' ============================================================
+
+Private Sub SchalteBlattschutzAus(ByVal wsKal As Worksheet)
+
+    On Error Resume Next
+
+    If Len(KALENDER_SCHUTZ_PASSWORT) > 0 Then
+        wsKal.Unprotect Password:=KALENDER_SCHUTZ_PASSWORT
+    Else
+        wsKal.Unprotect
+    End If
+
+    On Error GoTo 0
+
+End Sub
+
+
+' ============================================================
+' Blattschutz einschalten
+'
+' Wirkung:
+'   - gesperrte Zellen können nicht bearbeitet werden
+'   - entsperrte Dropdown-Zellen bleiben editierbar
+'   - Formeln, Statuszeilen, Statistik, Wochenenden,
+'     Feiertage und Hilfsspalten sind geschützt
+'
+' UserInterfaceOnly:=True erlaubt Makros weiterhin Änderungen,
+' solange die Datei in derselben Excel-Sitzung geöffnet ist.
+' ============================================================
+
+Private Sub SchalteBlattschutzEin(ByVal wsKal As Worksheet)
+
+    On Error Resume Next
+
+    If Len(KALENDER_SCHUTZ_PASSWORT) > 0 Then
+
+        wsKal.Protect _
+            Password:=KALENDER_SCHUTZ_PASSWORT, _
+            DrawingObjects:=True, _
+            Contents:=True, _
+            Scenarios:=True, _
+            UserInterfaceOnly:=True, _
+            AllowFormattingCells:=False, _
+            AllowFormattingColumns:=False, _
+            AllowFormattingRows:=False, _
+            AllowInsertingColumns:=False, _
+            AllowInsertingRows:=False, _
+            AllowDeletingColumns:=False, _
+            AllowDeletingRows:=False, _
+            AllowSorting:=False, _
+            AllowFiltering:=False, _
+            AllowUsingPivotTables:=False
+
+    Else
+
+        wsKal.Protect _
+            DrawingObjects:=True, _
+            Contents:=True, _
+            Scenarios:=True, _
+            UserInterfaceOnly:=True, _
+            AllowFormattingCells:=False, _
+            AllowFormattingColumns:=False, _
+            AllowFormattingRows:=False, _
+            AllowInsertingColumns:=False, _
+            AllowInsertingRows:=False, _
+            AllowDeletingColumns:=False, _
+            AllowDeletingRows:=False, _
+            AllowSorting:=False, _
+            AllowFiltering:=False, _
+            AllowUsingPivotTables:=False
+
+    End If
+
+    ' Im Betrieb sollen nur entsperrte Zellen auswählbar sein.
+    wsKal.EnableSelection = xlUnlockedCells
+
+    On Error GoTo 0
+
+End Sub
+
