@@ -1,0 +1,15 @@
+Offene Klärungspunkte: Delta-Imports
+Für beide Quellsysteme zuerst klären:
+Gibt es überhaupt eine zuverlässige Timestamp-Spalte (LAST_MODIFIED, UPDATED_AT o.ä.) in den relevanten Tabellen?
+
+Oracle 11g — LogMiner (Phase II Vormerk):
+Ist der Redo-Log auf der Oracle-Instanz aktiviert und ausreichend dimensioniert (Retention)?
+Welche Datenbankberechtigungen sind nötig (LOGMINING, SELECT ANY TRANSACTION) — wer vergibt diese?
+Läuft LogMiner auf der alten Instanz (11g) und auf der teilupgegradeten Instanz gleich — oder gibt es Unterschiede?
+Ist der DBA / IT-Infrastruktur-Kollege bereit, LogMiner für dispDB zu aktivieren und zu supporten?
+
+AS/400 / IBM Power i — Journal (Phase II Vormerk):
+Ist das Journaling auf den relevanten Bibliotheken / Tabellen bereits aktiv — oder muss es erst aktiviert werden?
+Wie lange werden Journal-Einträge aufbewahrt (Receiver-Retention)? Reicht das für deine Delta-Intervalle?
+Welche Zugriffsrechte braucht der dispDB-User, um Journal-Einträge lesen zu dürfen?
+Gibt es bereits eine bestehende IBM-i-JDBC- oder ODBC-Anbindung für Journal-Zugriff, oder muss das neu aufgebaut werden?
