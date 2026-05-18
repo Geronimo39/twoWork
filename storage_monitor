@@ -35,10 +35,10 @@ except ImportError:
 # ===========================================================================
 
 # ODBC-Verbindungsstring (wie in deinen anderen Skripten)
-ODBC_DSN = "AS400"          # oder vollständiger Connection-String
+ODBC_DSN = "uvw"          # oder vollständiger Connection-String
 
 # SQLite-Datenbank (bereits vorhanden aus Phase 2)
-SQLITE_PATH = r"C:\Users\stefan\as400_analysis.sqlite"  # Pfad anpassen
+SQLITE_PATH = r"C:\Users\...\as400_analysis.sqlite"  # Pfad anpassen
 
 # Verzeichnis, in dem deine wöchentlichen Excel-Snapshots liegen
 EXCEL_DIR = r"C:\Users\stefan\vrdat_snapshots"          # Pfad anpassen
