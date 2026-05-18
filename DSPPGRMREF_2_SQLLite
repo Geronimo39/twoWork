@@ -47,8 +47,8 @@ log = logging.getLogger(__name__)
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 # =============================================================================
 
-ODBC_DSN   = "AS400_DSN"          # Name deines ODBC-DSN
-MY_SCHEMA  = "MEINSCHEMA"         # Dein Schema mit Schreibrechten auf der AS/400
+ODBC_DSN   = "AS400_DSN"          
+MY_SCHEMA  = "MEINSCHEMA"         
 
 SQLITE_DB  = Path("as400_analysis.sqlite")
 PARQUET_DIR = Path("data/raw")
