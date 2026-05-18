@@ -24,12 +24,11 @@ from datetime import datetime
 from pathlib import Path
 
 # ── Konfiguration ─────────────────────────────────────────────────────────────
-DSN              = "AS400"              # ODBC-DSN Name
-MY_SCHEMA        = "STEFAN"            # Dein Write-Access Schema
-
+DSN              = "uvw"              # ODBC-DSN Name
+MY_SCHEMA        = "xyz"           
 # Job-Identifikation (alle drei Felder für eindeutigen Treffer)
 JOB_NUMBER       = "109105"            # Job-Nummer   (z.B. "109105")
-JOB_USER         = "KNAUER"            # Job-User     (z.B. "KNAUER")
+JOB_USER         = "EGAL"            # Job-User     (z.B. "jemand")
 JOB_NAME         = "TAGEND_NOP"        # Job-Name     (z.B. "TAGEND_NOP")
 
 # Spool-File-Name (so wie er auf der AS/400 heißt, z.B. "QPJOBLOG" oder "QPLOBLOG")
