@@ -18,8 +18,8 @@ from pathlib import Path
 import sys
 
 # ── Konfiguration ────────────────────────────────────────────────────────────
-DSN            = "AS400"          # ODBC-DSN Name
-MY_SCHEMA      = "STEFAN"         # Dein Write-Access Schema
+DSN            = "uvw"          # ODBC-DSN Name
+MY_SCHEMA      = "xyz"         # Dein Write-Access Schema
 OUTPUT_DIR     = Path(".")
 
 # ► Hier den Job-Namen eintragen (oder beim Start als Argument übergeben):
