@@ -18,7 +18,7 @@ from pathlib import Path
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 # =============================================================================
 
-PTH      = Path(r"C:\Users\Stadtherr\Documents\SndBx\4Reporting\DB2_DataLineage")
+PTH      = Path(r"C:\Users\...")
 SQLITE_DB = PTH / "as400_analysis.sqlite"
 
 # =============================================================================
