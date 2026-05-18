@@ -26,8 +26,8 @@ from pathlib import Path
 warnings.filterwarnings("ignore")
 
 # ── Konfiguration ────────────────────────────────────────────────────────────
-DSN            = "AS400"          # ODBC-DSN Name
-MY_SCHEMA      = "STEFAN"         # Dein Write-Access Schema
+DSN            = "uvw"          # ODBC-DSN Name
+MY_SCHEMA      = "xyz"         
 OUTPUT_DIR     = Path(".")        # Ausgabeverzeichnis
 OUTPUT_EXCEL   = OUTPUT_DIR / f"as400_regular_jobs_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
 HQST_DAYS_BACK = 30              # Wie viele Tage QHST rückwärts analysieren
