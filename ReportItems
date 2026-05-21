@@ -1,0 +1,43 @@
+Betreff: Basis-Report MVP – geplante KPIs und Scope-Abgrenzung
+
+im Nachgang zu unserem Gespräch möchte ich den vereinbarten Umfang des Basis-Reports im Rahmen des MVP schriftlich festhalten.
+Geplante KPIs – Nicht-Leben (5 Kennzahlen)
+Auf Basis der bekannten Quelldaten aus dem AS/400-System sind folgende fünf Kennzahlen vorgesehen:
+
+Bestand Stück
+Laufender Jahresbeitrag (Bestand)
+Neuzugang Stück
+Neuzugang Beitrag (Brutto)
+Bestandsentwicklungsquote
+
+Diese Kennzahlen bilden einen kohärenten Bestandsreport: Bestandsgröße, Neuzugang und Bestandsdynamik. Schadenquoten und Rentabilitätskennzahlen sind bewusst nicht Bestandteil dieses ersten Reports.
+Geplante KPIs – Leben (3 Kennzahlen, unter Vorbehalt; optional erweiterbar auf 5)
+Für den Lebensbereich sind folgende Kennzahlen vorgesehen, vorbehaltlich der Auswertung der technischen Dokumentation des Bestandssystems (msg-Life):
+
+Bestand Stück
+Laufender Jahresbeitrag (Bestand)
+Neugeschäft Stück
+
+Unter dem Vorbehalt erfolgreicher technischer Erschließung können ergänzend umgesetzt werden:
+
+Neugeschäft Beitrag laufend
+Stornoquote Stück
+
+Die Bestätigung der technischen Umsetzbarkeit der Leben-KPIs erfolgt nach Sichtung der msg-Life-Dokumentation. Ich schlage vor, diesen Klärungsstand bis Ende Juni 2026 herzustellen.
+Nicht im Scope dieses Basis-Reports
+Ausdrücklich nicht Bestandteil des MVP-Basis-Reports sind folgende Themenbereiche, die ein eigenständiges Vertriebssteuerungs-Konzept darstellen und einer separaten Projektphase bedürfen:
+
+Kundenwert und Deckungsbeitrag
+Provisions- und Courtagen-Reporting (BePro, Apro, lfd. Courtagen)
+BaFin-Vergütungslogik (Kategorien C1–C4)
+BiPRO- und Extranet-Anbindung
+Lead- und Kampagnendaten sowie Service- und Kontaktanlässe
+Zahlungsrückstände Bestandskunden (fachlich und technisch eigenständiges Thema)
+Vorzeitige Abgänge und Stornokennzahlen Leben in vertiefter Ausprägung (abhängig von vollständiger Erschließung der msg-Life-Datenbasis)
+
+Diese Kennzahlen sind fachlich wertvoll und im Rahmen der DnA-Plattform mittelfristig umsetzbar — sie sind jedoch kein Bestandteil eines Basis-Reports und werden in der Projektplanung als eigenständige Ausbaustufe behandelt.
+Ich freue mich auf den weiteren Austausch und stehe für Rückfragen gerne zur Verfügung
+
+Vermittlerhierarchie und regionale Filterung
+Die Darstellung von Kennzahlen auf Ebene einzelner Vermittler sowie die Filterung nach regionalen oder vertriebsseitig definierten Vermittlergruppierungen (z. B. Nord / Süd / Ost / West oder eigene Segmentlogiken) ist technisch in Power BI grundsätzlich vorgesehen und wird als Ausbaustufe ausdrücklich angestrebt. Voraussetzung hierfür ist eine sauber modellierte Vermittlerdimension im Datenmodell, einschließlich einer belastbaren Mapping-Logik zwischen Vermittler-ID und den jeweiligen Gruppierungsebenen. Da diese Zuordnungslogik fachlich durch den Vertrieb zu definieren und technisch in der Plattform als gepflegte Referenzdaten zu hinterlegen ist, handelt es sich hierbei nicht um ein Feature des MVP-Basis-Reports, sondern um einen eigenständigen Folgeschritt. Im Rahmen des MVP werden die Kennzahlen zunächst auf Gesamtebene ausgewiesen. Eine Filterung bis auf Einzelvermittlerebene ist als erster Ausbauschritt (MVP+) vorgesehen, sofern die Vermittler-ID in den Quelldaten konsistent verfügbar ist. Die vollständige hierarchische Drill-Down-Struktur nach Vertriebslogik ist Bestandteil von Phase II.
+
