@@ -1,0 +1,168 @@
+"""
+Konzept 2: Neugeschäft-Fokus
+Vertriebssteuerung – Was kommt rein? Plan vs. IST. Storno-Ampel.
+Zielgruppe: Vertriebsleitung, operativ
+Dummy-Daten: Illustrativ, kein Echtwert
+"""
+
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.patches as mpatches
+import numpy as np
+
+# ── Farben ────────────────────────────────────────────────────────────────────
+C_BG       = "#0F1923"   # Dunkel (Vertrieb-Style)
+C_PANEL    = "#1A2634"
+C_PRIMARY  = "#E8F4F8"
+C_ACCENT   = "#00B4D8"
+C_PLAN     = "#F77F00"
+C_POSITIVE = "#06D6A0"
+C_NEGATIVE = "#EF233C"
+C_NEUTRAL  = "#6B7C8D"
+
+# ── Dummy-Daten ───────────────────────────────────────────────────────────────
+jahre      = [2020, 2021, 2022, 2023, 2024]
+quartale   = ["Q1", "Q2", "Q3", "Q4"]
+
+nl_nz_ist  = [4_800, 5_100, 5_400, 5_600, 5_900]
+nl_nz_plan = [4_700, 5_000, 5_500, 5_800, 5_700]   # 2024: IST > Plan → gut
+
+nl_nz_beitrag_q = [0.35, 0.40, 0.38, 0.39]  # Quartale 2024
+
+lv_nz_stk  = [1_900, 2_050, 2_100, 2_200, 2_350]
+lv_nz_btr  = [3.8,   4.1,   4.3,   4.5,   4.9]   # Mio. EUR lfd. Beitrag NG
+
+stornoq    = 3.8   # % Stornoquote Leben 2024 (Dummy)
+stornoq_vj = 4.1
+
+# ── Figure ────────────────────────────────────────────────────────────────────
+fig = plt.figure(figsize=(18, 12), facecolor=C_BG)
+fig.suptitle("Neugeschäft-Report – Nicht-Leben & Leben  |  Berichtsjahr 2024",
+             fontsize=18, fontweight="bold", color=C_PRIMARY, y=0.97)
+fig.text(0.98, 0.97, "ENTWURF / DUMMY-DATEN", ha="right", va="top",
+         fontsize=9, color=C_NEUTRAL, style="italic")
+
+gs = gridspec.GridSpec(2, 3, figure=fig,
+                       hspace=0.50, wspace=0.35,
+                       left=0.06, right=0.97, top=0.91, bottom=0.07)
+
+x = np.arange(len(jahre))
+
+# ── Oben links: NL Neuzugang IST vs. Plan (Linien) ───────────────────────────
+ax1 = fig.add_subplot(gs[0, :2])
+ax1.set_facecolor(C_PANEL)
+ax1.plot(jahre, nl_nz_ist,  color=C_ACCENT,  marker="o", linewidth=2.5,
+         markersize=8, label="IST",  zorder=4)
+ax1.plot(jahre, nl_nz_plan, color=C_PLAN, marker="s", linewidth=2,
+         linestyle="--", markersize=7, label="Plan", zorder=3)
+ax1.fill_between(jahre, nl_nz_plan, nl_nz_ist,
+                 where=[i>=p for i,p in zip(nl_nz_ist, nl_nz_plan)],
+                 color=C_POSITIVE, alpha=0.15, label="Übererfüllung")
+ax1.fill_between(jahre, nl_nz_plan, nl_nz_ist,
+                 where=[i<p for i,p in zip(nl_nz_ist, nl_nz_plan)],
+                 color=C_NEGATIVE, alpha=0.15, label="Zielverfehlung")
+ax1.set_title("NL – Neuzugang Stück: IST vs. Plan (5 Jahre)", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax1.set_xticks(jahre); ax1.set_xticklabels(jahre, color=C_NEUTRAL, fontsize=9)
+ax1.set_ylabel("Anzahl Verträge", fontsize=9, color=C_NEUTRAL)
+ax1.yaxis.set_tick_params(labelcolor=C_NEUTRAL, labelsize=8)
+ax1.grid(linestyle="--", alpha=0.2, color=C_NEUTRAL)
+ax1.legend(fontsize=8.5, facecolor=C_PANEL, labelcolor=C_PRIMARY, framealpha=0.8)
+for spine in ax1.spines.values(): spine.set_color(C_NEUTRAL); spine.set_linewidth(0.5)
+for val_i, val_p, yr in zip(nl_nz_ist, nl_nz_plan, jahre):
+    color = C_POSITIVE if val_i >= val_p else C_NEGATIVE
+    ax1.annotate(f"{val_i:,}".replace(",","."),
+                 (yr, val_i), textcoords="offset points", xytext=(0,10),
+                 ha="center", fontsize=7.5, color=color, fontweight="bold")
+
+# ── Oben rechts: Storno-Ampel Leben ──────────────────────────────────────────
+ax2 = fig.add_subplot(gs[0, 2])
+ax2.set_facecolor(C_PANEL)
+ax2.axis("off")
+ax2.set_title("Leben – Stornoquote Stück 2024 *", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+
+# Ampel
+schwellen = [(0, 3.0, C_POSITIVE, "Gut\n< 3,0%"),
+             (3.0, 5.0, C_PLAN,   "Mittel\n3,0 – 5,0%"),
+             (5.0, 9.0, C_NEGATIVE,"Kritisch\n> 5,0%")]
+for i, (lo, hi, col, lbl) in enumerate(schwellen):
+    aktiv = lo <= stornoq < hi
+    alpha = 1.0 if aktiv else 0.25
+    circle = plt.Circle((0.5, 0.75 - i*0.22), 0.07, color=col, alpha=alpha,
+                         transform=ax2.transAxes, clip_on=False)
+    ax2.add_artist(circle)
+    ax2.text(0.62, 0.75 - i*0.22, lbl, va="center", fontsize=8.5,
+             color=col if aktiv else C_NEUTRAL,
+             fontweight="bold" if aktiv else "normal",
+             transform=ax2.transAxes)
+
+ax2.text(0.5, 0.12,  f"IST: {stornoq} %", ha="center", fontsize=20,
+         color=C_PLAN, fontweight="bold", transform=ax2.transAxes)
+ax2.text(0.5, 0.04, f"Vorjahr: {stornoq_vj} %  ▼ besser", ha="center",
+         fontsize=9, color=C_POSITIVE, transform=ax2.transAxes)
+
+# ── Unten links: NL Neuzugang Beitrag nach Quartal ───────────────────────────
+ax3 = fig.add_subplot(gs[1, :2])
+ax3.set_facecolor(C_PANEL)
+xq = np.arange(len(quartale))
+bars = ax3.bar(xq, nl_nz_beitrag_q, color=[C_ACCENT, C_ACCENT, C_ACCENT, C_POSITIVE],
+               width=0.5, zorder=3)
+ax3.set_xticks(xq); ax3.set_xticklabels(quartale, color=C_NEUTRAL, fontsize=10)
+ax3.set_title("NL – Neuzugang Beitrag Brutto nach Quartal 2024 (Mio. EUR)", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax3.set_ylabel("Mio. EUR", fontsize=9, color=C_NEUTRAL)
+ax3.yaxis.set_tick_params(labelcolor=C_NEUTRAL, labelsize=8)
+ax3.grid(axis="y", linestyle="--", alpha=0.2, color=C_NEUTRAL)
+for spine in ax3.spines.values(): spine.set_color(C_NEUTRAL); spine.set_linewidth(0.5)
+for bar, val in zip(bars, nl_nz_beitrag_q):
+    ax3.text(bar.get_x()+bar.get_width()/2, bar.get_height()+0.005,
+             f"{val:.2f}", ha="center", fontsize=10, color=C_PRIMARY, fontweight="bold")
+total_label = f"Gesamt 2024: {sum(nl_nz_beitrag_q):.2f} Mio. EUR"
+ax3.text(0.98, 0.93, total_label, transform=ax3.transAxes,
+         ha="right", fontsize=9, color=C_ACCENT, fontweight="bold")
+
+# ── Unten rechts: Leben NG Stück + Beitrag Tabelle ───────────────────────────
+ax4 = fig.add_subplot(gs[1, 2])
+ax4.set_facecolor(C_PANEL)
+ax4.axis("off")
+ax4.set_title("Leben – Neugeschäft Übersicht *", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+
+tbl_data = [["Jahr", "NG Stück", "NG Beitrag\nlfd. (Mio.)", "YoY Stück"]]
+for i, j in enumerate(jahre):
+    delta = ""
+    if i > 0:
+        d = (lv_nz_stk[i] - lv_nz_stk[i-1]) / lv_nz_stk[i-1] * 100
+        delta = f"▲ +{d:.1f}%" if d>=0 else f"▼ {d:.1f}%"
+    tbl_data.append([str(j),
+                     f"{lv_nz_stk[i]:,}".replace(",","."),
+                     f"{lv_nz_btr[i]:.1f}",
+                     delta])
+
+tbl = ax4.table(cellText=tbl_data, cellLoc="center", loc="center",
+                colWidths=[0.18, 0.25, 0.30, 0.27])
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(8.5)
+for (r,c), cell in tbl.get_celld().items():
+    cell.set_linewidth(0.3)
+    if r == 0:
+        cell.set_facecolor(C_ACCENT)
+        cell.set_text_props(color="white", fontweight="bold")
+    elif r == len(jahre):  # 2024 Zeile hervorheben
+        cell.set_facecolor("#243447")
+        cell.set_text_props(color=C_POSITIVE if c==3 else C_PRIMARY, fontweight="bold")
+    else:
+        cell.set_facecolor(C_PANEL if r%2==0 else "#1E2E3E")
+        cell.set_text_props(color=C_PRIMARY)
+tbl.scale(1, 1.65)
+
+# ── Fußzeile ──────────────────────────────────────────────────────────────────
+fig.text(0.05, 0.01,
+         "* Vorbehalt technische Umsetzbarkeit (msg-Life-Dokumentation ausstehend)  |  Alle Werte: Illustrative Dummy-Daten",
+         fontsize=7.5, color=C_NEUTRAL, style="italic")
+
+plt.savefig("/home/claude/report_mockups/konzept2_neugeschaeft.png",
+            dpi=150, bbox_inches="tight", facecolor=C_BG)
+print("Konzept 2 gespeichert.")
+plt.close()
