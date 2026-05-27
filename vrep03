@@ -1,0 +1,203 @@
+"""
+Konzept 3: Bestand & Entwicklung – Strategische Perspektive
+Wasserfall NL + Zeitreihe NL/Leben gestapelt + vollständige KPI-Ampeltabelle
+Zielgruppe: Geschäftsführung, strategische Planung
+Dummy-Daten: Illustrativ, kein Echtwert
+"""
+
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.patches as mpatches
+import numpy as np
+
+# ── Farben ────────────────────────────────────────────────────────────────────
+C_BG       = "#FAFAFA"
+C_PANEL    = "#FFFFFF"
+C_PRIMARY  = "#2C3E50"
+C_NL       = "#2980B9"
+C_LV       = "#16A085"
+C_ZUGANG   = "#27AE60"
+C_ABGANG   = "#E74C3C"
+C_NEUTRAL  = "#95A5A6"
+C_BORDER   = "#DEE2E6"
+
+PRIO_GRUEN  = "#27AE60"
+PRIO_GELB   = "#F39C12"
+PRIO_ROT    = "#E74C3C"
+
+# ── Dummy-Daten ───────────────────────────────────────────────────────────────
+jahre = [2020, 2021, 2022, 2023, 2024]
+
+# NL Wasserfall 2024
+wf_anfang  = 51_800
+wf_zugang  =  6_200
+wf_abgang  = -4_600
+wf_ende    = wf_anfang + wf_zugang + wf_abgang  # = 53_400
+
+# NL + Leben lfd. Jahresbeitrag
+nl_beitrag = [12.4, 12.9, 13.5, 14.1, 14.8]
+lv_beitrag = [ 8.1,  8.4,  8.7,  9.0,  9.3]
+
+# Alle 8 KPIs für Ampeltabelle
+kpi_tabelle = [
+    # (Bereich, KPI-Name, IST-Wert, Plan-Wert, Ampel, Prio)
+    ("NL", "Bestand Stück",               "53.400",  "52.000",  "▲ +2,7%",   PRIO_GRUEN),
+    ("NL", "Lfd. Jahresbeitrag (Mio.)",   "14,8",    "14,5",    "▲ +2,1%",   PRIO_GRUEN),
+    ("NL", "Neuzugang Stück",             "5.900",   "5.700",   "▲ +3,5%",   PRIO_GRUEN),
+    ("NL", "Neuzugang Beitrag (Mio.)",    "1,52",    "1,45",    "▲ +4,8%",   PRIO_GRUEN),
+    ("NL", "Bestandsentw.-quote %",       "3,1%",    "2,5%",    "▲ +0,6pp",  PRIO_GRUEN),
+    ("LV", "Bestand Stück *",             "23.000",  "22.800",  "▲ +0,9%",   PRIO_GELB),
+    ("LV", "Lfd. Jahresbeitrag (Mio.) *", "9,3",     "9,1",     "▲ +2,2%",   PRIO_GELB),
+    ("LV", "Neugeschäft Stück *",         "2.350",   "2.200",   "▲ +6,8%",   PRIO_GELB),
+]
+
+# ── Figure ────────────────────────────────────────────────────────────────────
+fig = plt.figure(figsize=(18, 13), facecolor=C_BG)
+fig.suptitle("Bestand & Entwicklung – Strategische Übersicht  |  Berichtsjahr 2024",
+             fontsize=18, fontweight="bold", color=C_PRIMARY, y=0.97)
+fig.text(0.98, 0.97, "ENTWURF / DUMMY-DATEN", ha="right", va="top",
+         fontsize=9, color=C_NEUTRAL, style="italic")
+
+gs = gridspec.GridSpec(3, 2, figure=fig,
+                       hspace=0.52, wspace=0.30,
+                       left=0.05, right=0.97, top=0.91, bottom=0.06)
+
+# ── Oben links: Wasserfall NL Bestandsentwicklung 2024 ───────────────────────
+ax1 = fig.add_subplot(gs[0, 0])
+ax1.set_facecolor(C_PANEL)
+
+kategorien = ["Anfangs-\nbestand", "Zugang", "Abgang", "End-\nbestand"]
+werte_abs  = [wf_anfang, wf_zugang, wf_abgang, wf_ende]
+farben     = [C_NL, C_ZUGANG, C_ABGANG, C_LV]
+unten      = [0, wf_anfang, wf_anfang + wf_zugang, 0]
+
+for i, (kat, val, bot, col) in enumerate(zip(kategorien, werte_abs, unten, farben)):
+    hoehe = abs(val)
+    ax1.bar(i, hoehe, bottom=bot if val>0 else bot+val,
+            color=col, width=0.55, zorder=3, edgecolor="white", linewidth=1.5)
+    y_text = bot + val/2 if val > 0 else bot + val/2
+    ax1.text(i, bot + val + (300 if val>0 else -700),
+             f"{val:+,}".replace(",",".") if i in [1,2] else f"{val:,}".replace(",","."),
+             ha="center", fontsize=9, fontweight="bold",
+             color=col if i in [1,2] else C_PRIMARY)
+
+# Verbindungslinien
+for i in range(3):
+    y_start = unten[i] + (werte_abs[i] if werte_abs[i]>0 else 0)
+    y_end   = unten[i+1]
+    ax1.plot([i+0.28, i+0.72], [y_start, y_end if i<2 else wf_ende],
+             color=C_NEUTRAL, linestyle="--", linewidth=0.8, alpha=0.6)
+
+ax1.set_xticks(range(4)); ax1.set_xticklabels(kategorien, fontsize=9)
+ax1.set_title("NL – Bestandsentwicklung 2024 (Wasserfall)", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax1.set_ylabel("Anzahl Verträge", fontsize=9, color=C_NEUTRAL)
+ax1.yaxis.set_tick_params(labelsize=8)
+ax1.grid(axis="y", linestyle="--", alpha=0.3, zorder=0)
+ax1.set_ylim(0, wf_ende * 1.12)
+for spine in ["top","right"]: ax1.spines[spine].set_visible(False)
+
+# ── Oben rechts: Lfd. Jahresbeitrag NL+LV gestapelt ─────────────────────────
+ax2 = fig.add_subplot(gs[0, 1])
+ax2.set_facecolor(C_PANEL)
+x = np.arange(len(jahre))
+b1 = ax2.bar(x, nl_beitrag, color=C_NL, width=0.55, label="Nicht-Leben", zorder=3)
+b2 = ax2.bar(x, lv_beitrag, bottom=nl_beitrag, color=C_LV, width=0.55,
+             label="Leben *", zorder=3, alpha=0.9)
+ax2.set_xticks(x); ax2.set_xticklabels(jahre, fontsize=9)
+ax2.set_title("Lfd. Jahresbeitrag NL + Leben – gestapelt (Mio. EUR)", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax2.set_ylabel("Mio. EUR", fontsize=9, color=C_NEUTRAL)
+ax2.yaxis.set_tick_params(labelsize=8)
+ax2.grid(axis="y", linestyle="--", alpha=0.3, zorder=0)
+ax2.legend(fontsize=9, framealpha=0.8)
+for spine in ["top","right"]: ax2.spines[spine].set_visible(False)
+total = [n+l for n,l in zip(nl_beitrag, lv_beitrag)]
+for xi, tot in zip(x, total):
+    ax2.text(xi, tot+0.2, f"{tot:.1f}", ha="center", fontsize=8, color=C_PRIMARY, fontweight="bold")
+
+# ── Mitte links: NL Beitrags-Zeitreihe (Linie) ───────────────────────────────
+ax3 = fig.add_subplot(gs[1, 0])
+ax3.set_facecolor(C_PANEL)
+ax3.plot(jahre, nl_beitrag, color=C_NL, marker="o", linewidth=2.5, markersize=8, zorder=4)
+ax3.fill_between(jahre, nl_beitrag, alpha=0.12, color=C_NL)
+ax3.set_xticks(jahre); ax3.set_xticklabels(jahre, fontsize=9)
+ax3.set_title("NL – Lfd. Jahresbeitrag Entwicklung (Mio. EUR)", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax3.set_ylabel("Mio. EUR", fontsize=9, color=C_NEUTRAL)
+ax3.yaxis.set_tick_params(labelsize=8)
+ax3.grid(linestyle="--", alpha=0.3, zorder=0)
+for spine in ["top","right"]: ax3.spines[spine].set_visible(False)
+for yr, val in zip(jahre, nl_beitrag):
+    ax3.annotate(f"{val:.1f}", (yr, val), textcoords="offset points",
+                 xytext=(0,9), ha="center", fontsize=8, color=C_NL, fontweight="bold")
+
+# ── Mitte rechts: Leben Beitrags-Zeitreihe ───────────────────────────────────
+ax4 = fig.add_subplot(gs[1, 1])
+ax4.set_facecolor(C_PANEL)
+ax4.plot(jahre, lv_beitrag, color=C_LV, marker="D", linewidth=2.5, markersize=8, zorder=4)
+ax4.fill_between(jahre, lv_beitrag, alpha=0.12, color=C_LV)
+ax4.set_xticks(jahre); ax4.set_xticklabels(jahre, fontsize=9)
+ax4.set_title("Leben – Lfd. Jahresbeitrag Entwicklung (Mio. EUR) *", fontsize=11,
+              color=C_PRIMARY, fontweight="bold", pad=8)
+ax4.set_ylabel("Mio. EUR", fontsize=9, color=C_NEUTRAL)
+ax4.yaxis.set_tick_params(labelsize=8)
+ax4.grid(linestyle="--", alpha=0.3, zorder=0)
+for spine in ["top","right"]: ax4.spines[spine].set_visible(False)
+for yr, val in zip(jahre, lv_beitrag):
+    ax4.annotate(f"{val:.1f}", (yr, val), textcoords="offset points",
+                 xytext=(0,9), ha="center", fontsize=8, color=C_LV, fontweight="bold")
+
+# ── Unten: vollständige KPI-Ampeltabelle ──────────────────────────────────────
+ax5 = fig.add_subplot(gs[2, :])
+ax5.set_facecolor(C_PANEL)
+ax5.axis("off")
+ax5.set_title("KPI-Übersicht 2024 – Alle Kennzahlen mit Zielerreichung",
+              fontsize=11, color=C_PRIMARY, fontweight="bold", pad=8)
+
+header = ["Bereich", "Kennzahl", "IST 2024", "Plan 2024", "Abweichung", "Priorität"]
+rows   = [[b, k, i, p, a, "●"] for b,k,i,p,a,pr in kpi_tabelle]
+
+tbl = ax5.table(cellText=[header]+rows, cellLoc="center", loc="center",
+                colWidths=[0.08, 0.28, 0.12, 0.12, 0.12, 0.08])
+tbl.auto_set_font_size(False)
+tbl.set_fontsize(9)
+
+for (r, c), cell in tbl.get_celld().items():
+    cell.set_linewidth(0.5)
+    cell.set_edgecolor(C_BORDER)
+    if r == 0:
+        cell.set_facecolor(C_PRIMARY)
+        cell.set_text_props(color="white", fontweight="bold")
+    else:
+        kpi_row = kpi_tabelle[r-1]
+        prio_col = kpi_row[5]
+        bg = "#F0FAF5" if kpi_row[0]=="NL" else "#F0F9F7"
+        cell.set_facecolor(bg)
+        if c == 5:
+            cell.set_text_props(color=prio_col, fontsize=14, fontweight="bold")
+        elif c == 4:
+            cell.set_text_props(color=PRIO_GRUEN, fontweight="bold")
+        else:
+            cell.set_text_props(color=C_PRIMARY)
+
+tbl.scale(1, 1.8)
+
+# ── Legenden-Patch ────────────────────────────────────────────────────────────
+leg_elems = [
+    mpatches.Patch(color=PRIO_GRUEN, label="● Prio 1 – Muss im Basis-Report"),
+    mpatches.Patch(color=PRIO_GELB,  label="● Prio 2 – Unter Vorbehalt msg-Life"),
+    mpatches.Patch(color=PRIO_ROT,   label="● Prio 3 – Phase II"),
+]
+fig.legend(handles=leg_elems, loc="lower right", fontsize=8.5,
+           facecolor=C_PANEL, framealpha=0.9, bbox_to_anchor=(0.97, 0.01))
+
+# ── Fußzeile ──────────────────────────────────────────────────────────────────
+fig.text(0.05, 0.01,
+         "* Vorbehalt technische Umsetzbarkeit (msg-Life-Dokumentation ausstehend)  |  Alle Werte: Illustrative Dummy-Daten",
+         fontsize=7.5, color=C_NEUTRAL, style="italic")
+
+plt.savefig("/home/claude/report_mockups/konzept3_bestand_entwicklung.png",
+            dpi=150, bbox_inches="tight", facecolor=C_BG)
+print("Konzept 3 gespeichert.")
+plt.close()
