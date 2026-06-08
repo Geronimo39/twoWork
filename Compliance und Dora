@@ -1,0 +1,67 @@
+Compliance & DORA-Konformität für dispDB — Überblick & Vorgehen
+Zur Frage der Formulierung vorab: explizit, dezidiert und dediziert sind alle drei verwendbar, aber nicht bedeutungsgleich.
+
+Explizit: ausdrücklich, unmissverständlich ausgesprochen
+Dezidiert: entschieden, bestimmt (Haltung/Absicht)
+Dediziert: für einen bestimmten Zweck reserviert (aus dem Englischen dedicated)
+
+Für deinen Satz passt dediziert am präzisesten — „dieser Chat ist dediziert für das Compliance-Thema" — weil du meinst, er ist dafür reserviert/vorgesehen. Dezidiert wäre auch vertretbar, klingt aber leicht altmodisch. Im technischen/Projektkontext ist dediziert mittlerweile Standard.
+
+1. Warum Compliance & DORA für dispDB keine Kür sind
+dispDB ist keine interne Spielwiese — es ist eine analytische Plattform in einem BaFin-regulierten Versicherungsunternehmen, die Vorstandsreporting beliefert und Daten aus produktiven Kernsystemen verarbeitet. Damit greifen automatisch:
+
+DORA (seit Januar 2025): ICT-Resilienz, Drittanbieter-Management, Incident Reporting
+BaFin-Rundschreiben zu BAIT/VAIT: IT-Governance-Anforderungen für Versicherungen
+DSGVO: personenbezogene Daten in Versicherungsverträgen
+Konzern-Richtlinien des Mutterkonzerns (der gleichzeitig ICT-Drittanbieter ist)
+
+Der entscheidende Punkt: DORA betrachtet den Mutterkonzern als ICT-Drittanbieter — seine Terraform-Infrastruktur, sein Azure-Tenant, seine ADLS-Bereitstellung. Das macht das Drittanbieter-Register und die Vertragsgestaltung zur Pflichtaufgabe, die du allein nicht lösen kannst.
+
+2. Das Vorgehen — in sinnvoller Reihenfolge
+Phase 0: Orientierung schaffen (jetzt, vor dem 11. Juni)
+Was: Verstehen, was im eigenen Haus bereits existiert — bevor du selbst etwas aufbaust.
+Die meisten Versicherungen haben als DORA-Reaktion bereits Strukturen geschaffen: ein ICT-Risikoregister, einen DORA-Beauftragten, Prozesse für Incident Reporting. Du musst das nicht erfinden, sondern andocken.
+Konkrete Fragen, die du intern stellen musst:
+
+Gibt es ein bestehendes ICT-Risikoregister? In welchem Format?
+Gibt es bereits einen DORA-Verantwortlichen (oft in der IT-Governance oder Compliance)?
+Gibt es eine Liste genehmigter ICT-Drittanbieter? Ist der Mutterkonzern darin erfasst?
+Gibt es ein Muster für technische Sicherheitskonzepte (TSK), das bei neuen Plattformen verlangt wird?
+
+Phase 1: Compliance frühzeitig einbeziehen
+Was: Keine technische Entscheidung zu Governance, Security oder Datenzugriff trifft man allein — Compliance gibt den Rahmen vor.
+Das konkrete Vorgehen:
+
+Kick-off-Gespräch mit dem Compliance-Beauftragten: „Was braucht ihr von mir für eine DORA-konforme Abnahme von dispDB — und wann?" Das ist die wichtigste Frage überhaupt, weil sie den Aufwand für dich definiert.
+Sensitivity-Label-Kategorien abstimmen: Was gilt als Vertraulich, was als Intern? Du konfigurierst es in Purview, aber die Kategorien kommen von Compliance.
+Gemeinsames ICT-Risikoregister: Du lieferst den technischen Teil (Komponenten, Risikobeschreibung, Maßnahmen), Compliance bewertet fachlich und genehmigt.
+
+Phase 2: Technische Maßnahmen bauen — mit Compliance als Abnehmer
+Das kennst du bereits aus dem Cheat-Sheet: Audit Trail (Delta Transaction Log + Monitor Hub + Azure Monitor), Verschlüsselung, Zugriffskontrollen, Unity Catalog ACLs, Purview Lineage.
+Der entscheidende Unterschied zu einem rein technischen Vorgehen: du dokumentierst für einen menschlichen Abnehmer, nicht nur für dich selbst. Das bedeutet konkret: Architekturdiagramm, Datenflusskarte, Komponentenbeschreibung mit Risikoeinstufung — in einer Form, die ein Compliance-Mitarbeiter ohne Databricks-Kenntnisse versteht.
+Phase 3: Formale Abnahme vor Go-Live
+Kein Vorstandsreport ohne Compliance-Freigabe. Das ist keine Bürokratie sondern dein Schutz — du willst nicht als TPB die persönliche Verantwortung für eine nicht abgenommene Plattform tragen.
+
+3. Wer ist einzubeziehen — und wann
+FunktionRolleZeitpunktCompliance-BeauftragterGibt regulatorischen Rahmen vor, genehmigt ICT-Risikoregister, unterzeichnet AbnahmeSofort — vor dem ersten technischen BuildInformationssicherheitsbeauftragter (ISB)Definiert Schutzbedarfsanalyse, prüft technische Sicherheitsmaßnahmen, gibt Sicherheitskonzept freiFrüh — spätestens bei Entscheidung über ZugriffskontrollkonzeptDatenschutzbeauftragter (DSB)Prüft DSGVO-Konformität (personenbezogene Versicherungsdaten!), ggf. Verzeichnis der VerarbeitungstätigkeitenFrüh — sobald klar ist, welche Daten verarbeitet werdenIT-RisikomanagementPflegt ICT-Risikoregister, bewertet Drittanbieterrisiko MutterkonzernParallel zu Phase 1Interner Revisor / Interne RevisionPrüft am Ende, ob Kontrollen greifenVor Go-Live — als TestlaufDORA-Beauftragter (falls separat)Koordiniert DORA-Umsetzung konzernweitPhase 0 — OrientierungMutterkonzern DNA-TeamLiefert Infrastruktur-Dokumentation für Drittanbieter-RegisterSobald du das Register aufbaust
+Nicht jede dieser Rollen existiert als separate Person — in kleineren Häusern trägt ein Compliance-Mitarbeiter mehrere davon. Die erste Aufgabe ist herauszufinden, wer bei euch konkret welche Funktion hat.
+
+4. Das zentrale Dokument: das technische Sicherheitskonzept
+Fast alle diese Stakeholder wollen letztlich ein Dokument: das technische Sicherheitskonzept (TSK) für dispDB. Es enthält typischerweise:
+
+Systemzweck und Datenklassen
+Architektur und Datenfluss
+Schutzbedarfsanalyse (was passiert bei Verlust / Kompromittierung)
+Technische Schutzmaßnahmen (Verschlüsselung, Zugriffskontrolle, Monitoring)
+Notfall- und Wiederherstellungskonzept (RTO/RPO)
+Drittanbieter-Aufstellung (Mutterkonzern, Microsoft, Databricks)
+Verantwortlichkeiten
+
+Das erstellst du einmal, ordentlich — und es ist die Grundlage für ICT-Risikoregister, DORA-Abnahme und interne Revision zugleich.
+
+5. Pragmatische Empfehlung für den Start
+Drei Schritte, bevor du am 11. Juni anfängst zu bauen:
+Schritt 1: Finde heraus, wer intern die DORA-/Compliance-Verantwortung trägt. Ein kurzes E-Mail an deinen Vorgesetzten oder den IT-Leiter reicht: „Wer ist unser Ansprechpartner für DORA und IT-Sicherheitsfreigaben bei neuen Plattformen?"
+Schritt 2: Führe ein erstes 30-Minuten-Gespräch mit dieser Person. Einzige Agenda: „Was braucht ihr von mir für eine Abnahme — und in welchem Format?"
+Schritt 3: Kläre, ob ein Technisches Sicherheitskonzept nach einem internen Muster verlangt wird. Wenn ja, besorge das Muster jetzt — nicht nach dem Build.
+Alles andere — Sensitivity Labels konfigurieren, Unity Catalog ACLs setzen, Monitor Hub einrichten — baut auf diesen Antworten auf.
