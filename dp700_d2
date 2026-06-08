@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP-700 Crashkurs — Tag 2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f6e56; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #0f6e56; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #0f6e56; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f6e56; border-left: 4px solid #0f6e56; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #0a6e51; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .exam-note { background: #e8f2fb; border: 1px solid #90c0ea; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #0d4a8a; margin-top: 8px; }
+  .exam-note strong { color: #185fa5; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0f6e56; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-blue{background:#d4e8f8;color:#185fa5;} .tag-coral{background:#fbe0d4;color:#8a3318;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .layer-stack { display: flex; flex-direction: column; gap: 0; }
+  .layer { padding: 8px 12px; font-size: 11px; }
+  .layer-1 { background: #f5f5f5; border: 1px solid #d0d0d0; border-radius: 8px 8px 0 0; }
+  .layer-2 { background: #f3f0fd; border: 1px solid #c5b8f5; border-left: 1px solid #c5b8f5; border-right: 1px solid #c5b8f5; border-top: none; margin: 0 8px; }
+  .layer-3 { background: #e8f7f2; border: 1px solid #7dd4b8; border-left: 1px solid #7dd4b8; border-right: 1px solid #7dd4b8; border-top: none; margin: 0 20px; }
+  .layer-4 { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 0 0 8px 8px; border-top: none; margin: 0 36px; }
+  .layer h4 { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+  .layer-1 h4 { color: #444; }
+  .layer-2 h4 { color: #4a2fa0; }
+  .layer-3 h4 { color: #0a6e51; }
+  .layer-4 h4 { color: #8a3318; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 2</h1><div class="subtitle">Sicherheits-Schichtenmodell · Item-Level · RLS/OLS · Column Security · Sensitivity Labels</div></div>
+    <div class="badge">Seite 1 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Das Sicherheits-Schichtenmodell in Fabric</div>
+    <div class="highlight"><strong>Schlüsselprinzip:</strong> Alle Schichten wirken kumulativ — jede Schicht ist eine zusätzliche Hürde. Ein Workspace-Admin kann trotzdem durch RLS eingeschränkt sein. Ein Viewer kann trotzdem durch Column-Level Security bestimmte Spalten nicht sehen.</div>
+    <div class="grid-2">
+      <div class="layer-stack">
+        <div class="layer layer-1">
+          <h4>Schicht 1 — Entra ID &amp; Azure RBAC (außen)</h4>
+          <span style="font-size:11px;color:#555">Wer darf sich bei Fabric anmelden? Tenant-Ebene. Vom Mutterkonzern verwaltet.</span>
+        </div>
+        <div class="layer layer-2">
+          <h4>Schicht 2 — Workspace Roles</h4>
+          <span style="font-size:11px;color:#555">Admin / Member / Contributor / Viewer — gilt pauschal für alle Artefakte im Workspace.</span>
+        </div>
+        <div class="layer layer-3">
+          <h4>Schicht 3 — Item-Level Permissions</h4>
+          <span style="font-size:11px;color:#555">Einzelne Artefakte gezielt teilen — auch ohne Workspace-Zugriff.</span>
+        </div>
+        <div class="layer layer-4">
+          <h4>Schicht 4 — Data-Level Security (innen)</h4>
+          <span style="font-size:11px;color:#555">RLS · OLS · Column-Level Security · Dynamic Data Masking</span>
+        </div>
+      </div>
+      <div class="card card-teal">
+        <h3>Item-Level Permissions — Lakehouse</h3>
+        <ul>
+          <li><strong>ReadAll:</strong> alle Dateien &amp; Tabellen via OneLake lesen (inkl. rohe Parquet-Dateien)</li>
+          <li><strong>Read:</strong> nur via SQL Endpoint auf Delta-Tabellen — keine rohen Dateien</li>
+          <li><strong>ReadData:</strong> SQL + Dateizugriff auf definierte Tabellen</li>
+          <li><strong>Semantic Model — Build:</strong> eigene Reports auf Basis dieses Modells bauen</li>
+          <li><strong>Semantic Model — Read:</strong> Reports lesen die auf dem Modell basieren</li>
+        </ul>
+        <div class="dispdb-note"><strong>dispDB:</strong> Vorstand bekommt Read auf Semantic Model + direkten Report-Share — kein Workspace-Zugriff nötig.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Row-Level Security (RLS) — statisch vs. dynamisch</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Statische RLS</h3>
+        <ul>
+          <li>Rolle ist fest definiert</li>
+          <li>Jeder in Rolle "Regionalleiter_Nord" sieht immer Region = "Nord"</li>
+          <li>Separate Rolle pro Nutzergruppe nötig</li>
+          <li>Einfach zu verstehen, aber schlecht skalierbar</li>
+          <li>Für wenige feste Gruppen geeignet</li>
+        </ul>
+        <div class="code-block">// Statischer DAX-Filter<br>[Region] = "Nord"</div>
+      </div>
+      <div class="card card-purple">
+        <h3>Dynamische RLS <span class="tag tag-blue">Prüfungsrelevant!</span></h3>
+        <ul>
+          <li>Eine Rolle für alle Nutzer — skalierbar</li>
+          <li>Liest die E-Mail des eingeloggten Users</li>
+          <li>Mapping-Tabelle: UserEmail ↔ erlaubte Region</li>
+          <li>Jeder sieht automatisch nur seine eigenen Daten</li>
+          <li>Für viele Nutzer mit individuellen Einschränkungen ideal</li>
+        </ul>
+        <div class="code-block">// Dynamischer DAX-Filter<br>[UserEmail] = USERPRINCIPALNAME()</div>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp RLS vs. OLS:</strong> RLS filtert <em>Zeilen</em> — der Nutzer sieht die Tabelle, aber nur erlaubte Zeilen. OLS versteckt ganze <em>Tabellen oder Spalten</em> komplett — der Nutzer sieht sie nicht mal in der Feldliste. Beide wirken im Semantic Model.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Column-Level Security &amp; Dynamic Data Masking (Fabric Warehouse)</div>
+    <div class="highlight"><strong>Wichtig:</strong> Column-Level Security und Dynamic Data Masking gelten für das <strong>Fabric Warehouse</strong> (T-SQL) — nicht für das Lakehouse. Für Lakehouse-Spalten: Unity Catalog Column Masks in Databricks.</div>
+    <div class="grid-2">
+      <div class="card card-coral">
+        <h3>Column-Level Security</h3>
+        <ul>
+          <li>T-SQL GRANT/DENY auf Spaltenebene</li>
+          <li>Spalte wird komplett verweigert</li>
+          <li>User bekommt Fehler beim Zugriff</li>
+          <li>Geeignet wenn Spalte gar nicht sichtbar sein soll</li>
+        </ul>
+        <div class="code-block">-- Gruppe "Analysten" darf IBAN nicht lesen<br>DENY SELECT ON dbo.Kunden (IBAN)<br>&nbsp;&nbsp;TO [Analysten];</div>
+      </div>
+      <div class="card card-coral">
+        <h3>Dynamic Data Masking</h3>
+        <ul>
+          <li>Spalte wird maskiert angezeigt — kein Fehler</li>
+          <li>User kann mit Daten arbeiten, sieht nicht den echten Wert</li>
+          <li>Geeignet wenn Spalte sichtbar, aber anonymisiert sein soll</li>
+          <li>Verschiedene Masking-Funktionen verfügbar</li>
+        </ul>
+        <div class="code-block">-- IBAN wird maskiert: zeigt "XXXX...1234"<br>ALTER TABLE dbo.Kunden<br>ALTER COLUMN IBAN<br>&nbsp;&nbsp;ADD MASKED WITH<br>&nbsp;&nbsp;(FUNCTION = 'partial(0,"XXXX",4)');</div>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB:</strong> Kundenbezogene Spalten (IBAN, Geburtsdatum, Name) im Warehouse via Dynamic Data Masking schützen — Analysten arbeiten mit Daten ohne echte Werte zu sehen. Bronze/Silver im Lakehouse: Databricks Unity Catalog Column Masks.</div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 2</span><span>Seite 1 — Schichtenmodell, Item-Level, RLS/OLS, Column Security</span></div>
+</div>
+
+<!-- SEITE 2 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 2</h1><div class="subtitle">OneLake Shortcut-Sicherheit · Sensitivity Labels · Begriffe · Prüfungs-Quickref</div></div>
+    <div class="badge">Seite 2 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">OneLake Shortcut-Sicherheit — Delegated Access</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Das Sicherheitsrisiko bei Shortcuts</h3>
+        <ul>
+          <li>Shortcut-Berechtigungen basieren auf dem User der den Shortcut erstellt hat</li>
+          <li>Nicht auf dem User der darauf zugreift</li>
+          <li>Wenn Admin den Shortcut erstellt → alle Workspace-Viewer nutzen Admin-Rechte</li>
+          <li>Viewer könnten Daten sehen die sie nicht sehen sollten</li>
+          <li>Das nennt sich <strong>Delegated Access</strong></li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Die Lösung: OneLake Data Access Roles</h3>
+        <ul>
+          <li>Ordner-Level Berechtigungen in OneLake setzen</li>
+          <li>Gilt unabhängig vom Shortcut</li>
+          <li>Gruppe A: nur Lesezugriff auf <code>gold/</code></li>
+          <li>Gruppe B: Lesezugriff auf <code>bronze/</code> + <code>silver/</code> + <code>gold/</code></li>
+          <li>Auch für externe Dienste (Databricks) steuerbar</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Delegated Access bei Shortcuts ist ein typisches Prüfungsthema — insbesondere die Frage "Was passiert wenn ein Admin einen Shortcut erstellt und ein Viewer darauf zugreift?" Antwort: Viewer nutzt Admin-Rechte auf ADLS → OneLake Data Access Roles als Gegenmaßnahme.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Sensitivity Labels — vollständiger Workflow</div>
+    <div class="grid-4">
+      <div class="card card-green">
+        <h3>1 — Definition</h3>
+        <ul>
+          <li>Compliance definiert Label-Hierarchie in Purview</li>
+          <li>Öffentlich → Intern → Vertraulich → Streng Vertraulich</li>
+          <li>Einmalig, gilt für gesamten Tenant</li>
+          <li>Zusammen mit Compliance abstimmen!</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>2 — Auto-Klassifizierung</h3>
+        <ul>
+          <li>Purview scannt Daten automatisch</li>
+          <li>Erkennt Muster (IBAN, Geburtsdatum)</li>
+          <li>Schlägt Label vor</li>
+          <li>Manuelle Bestätigung empfohlen</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>3 — Anwendung</h3>
+        <ul>
+          <li>Labels in Fabric zuweisen</li>
+          <li>Auf Lakehouse-, Tabellen-, Report-Ebene</li>
+          <li>Manuell oder via Policy</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>4 — Propagation &amp; Enforcement</h3>
+        <ul>
+          <li>Labels propagieren nach unten</li>
+          <li>Lakehouse "Vertraulich" → Report erbt "Vertraulich"</li>
+          <li>Export nach Excel: Purview kann blockieren</li>
+          <li>Downgrade verhinderbar</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Label-Empfehlung:</strong> Bronze/Silver → "Vertraulich" (Rohdaten mit Kundenbezug) · Gold-Tabellen je nach Inhalt → "Vertraulich" oder "Intern" · Vorstandsreport → "Intern" · Klassifizierung mit Compliance-Abteilung abstimmen!</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Sicherheitskonzepte — Vergleichstabelle</div>
+    <table>
+      <tr><th style="width:22%">Konzept</th><th style="width:15%">Schicht</th><th style="width:18%">Gilt für</th><th style="width:25%">Was es tut</th><th style="width:20%">dispDB-Einsatz</th></tr>
+      <tr><td><strong>Workspace Roles</strong></td><td>Workspace</td><td>Alle Artefakte</td><td>Admin/Member/Contributor/Viewer — pauschal</td><td>Stefan=Admin, Vorstand=Viewer</td></tr>
+      <tr><td><strong>Item-Level Permissions</strong></td><td>Artefakt</td><td>Einzelne Items</td><td>Gezielter Zugriff ohne Workspace-Rolle</td><td>Report direkt an Vorstand teilen</td></tr>
+      <tr><td><strong>RLS (statisch)</strong></td><td>Daten</td><td>Semantic Model</td><td>Zeilen filtern — feste Rolle pro Gruppe</td><td>Phase II: Abteilungsberichte</td></tr>
+      <tr><td><strong>RLS (dynamisch)</strong></td><td>Daten</td><td>Semantic Model</td><td>Zeilen filtern — USERPRINCIPALNAME()</td><td>Phase II: skalierbar für viele Nutzer</td></tr>
+      <tr><td><strong>OLS</strong></td><td>Daten</td><td>Semantic Model</td><td>Tabellen/Spalten komplett verstecken</td><td>Sensible Tabellen für Standardnutzer</td></tr>
+      <tr><td><strong>Column-Level Security</strong></td><td>Daten</td><td>Fabric Warehouse</td><td>Spalte verweigern (Fehler bei Zugriff)</td><td>IBAN-Spalte für Analysten sperren</td></tr>
+      <tr><td><strong>Dynamic Data Masking</strong></td><td>Daten</td><td>Fabric Warehouse</td><td>Spalte maskiert anzeigen (kein Fehler)</td><td>IBAN maskiert: ****1234</td></tr>
+      <tr><td><strong>OneLake Access Roles</strong></td><td>Speicher</td><td>OneLake Ordner</td><td>Ordner-Level Zugriff — unabhängig von Shortcuts</td><td>Gold-Ordner nur für BI-Gruppe</td></tr>
+      <tr><td><strong>Sensitivity Labels</strong></td><td>Compliance</td><td>Alle Artefakte</td><td>Klassifizierung + Enforcement beim Export</td><td>Bronze=Vertraulich, Report=Intern</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tag 2 — Prüfungs-Quickref</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Typische Prüfungsfragen Tag 2</h3>
+        <ul>
+          <li>"RLS vs. OLS — was filtert Zeilen, was versteckt Objekte?" → RLS filtert Zeilen, OLS versteckt Objekte</li>
+          <li>"Statisch vs. dynamisch RLS — wann welches?" → Dynamisch für viele Nutzer (USERPRINCIPALNAME)</li>
+          <li>"Column-Level vs. Dynamic Data Masking?" → CLS verweigert, DDM maskiert</li>
+          <li>"Shortcut-Sicherheitsrisiko?" → Delegated Access → OneLake Access Roles als Lösung</li>
+          <li>"Sensitivity Label Propagation?" → von oben nach unten, Lakehouse vererbt an Report</li>
+          <li>"Item-Level Permissions für was?" → gezielter Zugriff ohne Workspace-Rolle</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Wichtige Unterschiede zum Merken</h3>
+        <ul>
+          <li><strong>RLS</strong> = Zeilen filtern (Lakehouse + Semantic Model)</li>
+          <li><strong>OLS</strong> = Objekte verstecken (nur Semantic Model)</li>
+          <li><strong>Column-Level Security</strong> = verweigern (Warehouse, T-SQL)</li>
+          <li><strong>Dynamic Data Masking</strong> = maskieren (Warehouse, T-SQL)</li>
+          <li><strong>OneLake Access Roles</strong> = Ordner-Ebene, unabhängig von Shortcuts</li>
+          <li><strong>Item-Level Permissions</strong> = einzelne Artefakte, kein Workspace nötig</li>
+          <li><strong>Dynamische RLS</strong> = USERPRINCIPALNAME() — eine Rolle für alle</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 2</span><span>Seite 2 — Shortcut-Sicherheit, Sensitivity Labels, Vergleichstabelle, Prüfungs-Quickref</span></div>
+</div>
+
+</body>
+</html>
