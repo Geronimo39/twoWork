@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS Fabric – Cheat-Sheet Woche 5</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #5c3eb5; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #5c3eb5; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #5c3eb5; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #5c3eb5; border-left: 4px solid #5c3eb5; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #7a4a08; }
+  .essential { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #3c3489; margin-bottom: 6px; font-style: italic; }
+  .essential strong { color: #4a2fa0; font-style: normal; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #5c3eb5; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-coral{background:#fbe0d4;color:#8a3318;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-gray{background:#ebebeb;color:#444;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .compliance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .comp-left { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px 0 0 8px; padding: 10px 12px; }
+  .comp-right { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 0 8px 8px 0; padding: 10px 12px; border-left: none; }
+  .comp-left h3 { color: #0a6e51; font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .comp-right h3 { color: #7a4a08; font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .comp-left li, .comp-right li { font-size: 11px; color: #444; line-height: 1.55; }
+  .comp-left ul, .comp-right ul { padding-left: 14px; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Workspace Roles & DORA -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 5</h1><div class="subtitle">Governance · Sicherheit · DORA-Compliance — Fabric &amp; Databricks</div></div>
+    <div class="badge">Seite 1 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Fabric Workspace Roles — wer darf was</div>
+    <table>
+      <tr><th style="width:18%">Rolle</th><th style="width:12%">Lesen</th><th style="width:14%">Bearbeiten</th><th style="width:14%">Publizieren</th><th style="width:14%">Verwalten</th><th style="width:28%">dispDB-Zuweisung</th></tr>
+      <tr><td><strong>Viewer</strong></td><td>✓</td><td>✗</td><td>✗</td><td>✗</td><td>Vorstand, Business-Nutzer (nur Reports lesen)</td></tr>
+      <tr><td><strong>Contributor</strong></td><td>✓</td><td>✓</td><td>✗</td><td>✗</td><td>Data Analyst (Entwicklung, kein Publish)</td></tr>
+      <tr><td><strong>Member</strong></td><td>✓</td><td>✓</td><td>✓</td><td>teilweise</td><td>Data Scientist, IT-Infrastruktur-Kollege</td></tr>
+      <tr><td><strong>Admin</strong></td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><strong>Stefan</strong> — vollständige Kontrolle</td></tr>
+    </table>
+    <div class="dispdb-note"><strong>Item-Level Permissions:</strong> Einzelne Artefakte (z.B. ein Semantic Model) können mit externen Nutzern geteilt werden — ohne ihnen Workspace-Zugriff zu geben. Für Vorstandsreport-Verteilung außerhalb des Teams relevant.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">DORA-Compliance — was das konkret für dispDB bedeutet</div>
+    <div class="highlight"><strong>DORA (Digital Operational Resilience Act)</strong> gilt seit Januar 2025 für Finanzinstitute und ihre ICT-Dienstleister. Der Mutterkonzern als Infrastrukturlieferant ist ein <strong>ICT-Drittanbieter</strong> — seine Verträge müssen DORA-konform sein.</div>
+    <table>
+      <tr><th style="width:25%">DORA-Bereich</th><th style="width:40%">Was es bedeutet</th><th style="width:35%">Technische Umsetzung in dispDB</th></tr>
+      <tr><td><strong>ICT-Risikomanagement</strong></td><td>Pipeline-Architektur dokumentiert; jede Komponente als ICT-Risiko erfasst</td><td>Architektur-Dokumentation; Risikoregister für SHIR, ADLS, Databricks, Fabric</td></tr>
+      <tr><td><strong>Incident Reporting</strong></td><td>Plattformausfall = ICT-Incident; intern 4h, BaFin je nach Schwere</td><td>Monitor Hub + Azure Monitor Alerting; Eskalations-Prozess definieren</td></tr>
+      <tr><td><strong>Business Continuity</strong></td><td>RTO und RPO für jede kritische Komponente definiert</td><td>Delta Lake Time Travel als Wiederherstellungs-Mechanismus; Backup-Strategie ADLS</td></tr>
+      <tr><td><strong>Audit Trail</strong></td><td>Jede Datenbewegung und -transformation nachvollziehbar</td><td>Delta Transaction Log + Monitor Hub + Azure Monitor Logs (Databricks) + Purview Lineage</td></tr>
+      <tr><td><strong>Datensicherheit</strong></td><td>Verschlüsselung at rest und in transit; Zugriffsprotokollierung</td><td>AES-256 auf ADLS; TLS 1.2+ für alle Verbindungen; Entra ID Audit Logs</td></tr>
+    </table>
+    <div class="warn-note"><strong>Wichtigste Frage an die Compliance-Abteilung:</strong> „Welche konkreten Nachweise braucht ihr für eine DORA-konforme Abnahme von dispDB — und in welchem Format?" — diese Antwort frühzeitig einholen spart enorm viel Nacharbeit!</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Compliance-Abteilung — wer macht was?</div>
+    <div class="compliance-grid">
+      <div class="comp-left">
+        <h3>Compliance-Abteilung</h3>
+        <ul>
+          <li>Interpretiert regulatorische Anforderungen (DORA, BaFin, DSGVO)</li>
+          <li>Führt interne Audits durch</li>
+          <li>Genehmigt ICT-Risikoregister</li>
+          <li>Meldet ICT-Incidents an BaFin</li>
+          <li>Definiert Sensitivity-Label-Kategorien</li>
+          <li>Signiert finale DORA-Konformität (Abnahme)</li>
+          <li><strong>Frühzeitig einbeziehen — vor dem Bauen!</strong></li>
+        </ul>
+      </div>
+      <div class="comp-right">
+        <h3>Stefan (Projektleiter / Architect)</h3>
+        <ul>
+          <li>Setzt technische Maßnahmen um</li>
+          <li>Dokumentiert Architektur prüfungsgerecht</li>
+          <li>Implementiert Audit Trails (Delta Log, Monitor Hub)</li>
+          <li>Konfiguriert Sensitivity Labels in Purview</li>
+          <li>Konfiguriert Zugriffskontrollen (Workspace Roles, Unity Catalog)</li>
+          <li>Definiert RTO/RPO für technische Komponenten</li>
+          <li>Füllt ICT-Risikoregister (technischer Teil)</li>
+          <li>Meldet technische Incidents intern an Compliance</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>Empfehlung:</strong> Monatlicher Review-Termin mit Compliance während der Aufbauphase. Gemeinsames ICT-Risikoregister: Stefan füllt technisch, Compliance bewertet fachlich. Vor Go-Live: formale Compliance-Abnahme einplanen.</div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 5</span><span>Seite 1 — Workspace Roles, DORA, Compliance-Aufgabenteilung</span></div>
+</div>
+
+<!-- SEITE 2: Purview, Databricks Unity Catalog, Monitoring -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 5</h1><div class="subtitle">Microsoft Purview · Databricks Unity Catalog · Monitoring &amp; Alerting</div></div>
+    <div class="badge">Seite 2 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Microsoft Purview — Data Catalog, Lineage &amp; Sensitivity Labels</div>
+    <div class="grid-3">
+      <div class="card card-purple">
+        <h3>Data Catalog</h3>
+        <ul>
+          <li>Automatische Erkennung aller Fabric-Artefakte</li>
+          <li>Jede Tabelle bekommt Metadaten-Profil</li>
+          <li>Was ist drin, woher kommt es, wer nutzt es</li>
+          <li>Business Glossary für einheitliche Begriffe</li>
+          <li>Suchbar für alle autorisierten Nutzer</li>
+          <li>Integration: Fabric nativ, Databricks via Connector</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Data Lineage</h3>
+        <ul>
+          <li>Automatisches Tracking des Datenflusses</li>
+          <li>AS/400 → Bronze → Silver → Gold → Report</li>
+          <li>Für DORA-Audits direkt nutzbar</li>
+          <li>Zeigt woher jede Zahl im Report kommt</li>
+          <li>Impact Analysis: was bricht wenn Quelle X ausfällt?</li>
+          <li><strong>Für dispDB: DORA-Nachweis ohne Extra-Aufwand</strong></li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Sensitivity Labels</h3>
+        <ul>
+          <li>Klassifizierung nach Vertraulichkeit</li>
+          <li>In Purview definiert, in Fabric angewendet</li>
+          <li>Gelten auch für exportierte Dateien &amp; Reports</li>
+          <li><strong>Vertraulich:</strong> Kundendaten, Schadensdaten</li>
+          <li><strong>Intern:</strong> aggregierte KPIs, Berichte</li>
+          <li><strong>Öffentlich:</strong> nichts in dispDB</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Databricks Unity Catalog — Governance für die Medallion-Schichten</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Drei-Ebenen-Hierarchie</h3>
+        <ul>
+          <li><strong>Catalog</strong> → Schema (Database) → Table</li>
+          <li><code>dispdb_catalog / bronze / as400_buchungen</code></li>
+          <li><code>dispdb_catalog / silver / buchungen_harmonisiert</code></li>
+          <li><code>dispdb_catalog / gold / vorstandsreport_kpi</code></li>
+          <li>Zentrale Metadaten für alle Databricks-Workspaces</li>
+          <li>Data Lineage: welches Notebook hat welche Tabelle geschrieben</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Zugriffskontrolle im Unity Catalog</h3>
+        <ul>
+          <li><strong>Table-Level:</strong> <code>GRANT SELECT ON TABLE gold.kpi TO GROUP bi_team</code></li>
+          <li><strong>Column-Level Security:</strong> Spalten nur für autorisierte Gruppen</li>
+          <li><strong>Row Filters:</strong> Zeilen nach Gruppenzugehörigkeit filtern</li>
+          <li><strong>Column Masks:</strong> Kontonr. maskiert: <code>****1234</code></li>
+          <li>Audit Logs: wer hat wann welche Tabelle gelesen</li>
+          <li>Integration mit Entra ID / Azure AD</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Gold Layer:</strong> Nur die BI-Gruppe darf Gold-Tabellen lesen. Bronze und Silver: nur Databricks-Service-Principal und Stefan. Kundenbezogene Spalten in Silver: Column Mask für alle außer definierten Rollen.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Monitoring &amp; Alerting — Fabric und Databricks</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Fabric — Monitor Hub &amp; Capacity</h3>
+        <ul>
+          <li><strong>Monitor Hub:</strong> alle Pipeline-Runs, Status, Dauer, Fehler</li>
+          <li>Filter nach Zeitraum, Status, Artefakt-Typ</li>
+          <li>Direkter Link zu Fehlerdetails pro Activity</li>
+          <li><strong>Capacity Metrics App:</strong> CU-Verbrauch über Zeit</li>
+          <li>Throttling erkennen (wenn Capacity überschritten)</li>
+          <li><strong>Alerting:</strong> Power Automate oder Azure Monitor</li>
+          <li>z.B. E-Mail bei Pipeline-Fehler oder CU-Schwellwert</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Databricks — Jobs UI &amp; Azure Monitor</h3>
+        <ul>
+          <li><strong>Databricks Jobs UI:</strong> Status und Logs aller Notebook-Jobs</li>
+          <li><strong>Spark UI:</strong> Performance-Analyse (Stages, Tasks, Shuffle)</li>
+          <li>Bottlenecks in Spark-Jobs identifizieren</li>
+          <li><strong>Azure Monitor Integration:</strong> Cluster- und Job-Logs zentral</li>
+          <li>Log Analytics Workspace: beide Plattformen zusammen</li>
+          <li>Korrelierte Incident-Analyse über Fabric + Databricks</li>
+          <li><strong>DORA:</strong> zentrales Logging ist Pflicht</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>Empfehlung für dispDB:</strong> Fabric Monitor Hub + Databricks Job Logs + Azure Monitor Log Analytics Workspace als zentrales Log-System. Alerting via Azure Monitor Alerts für kritische Pipeline-Fehler und Capacity-Überschreitungen. Das ist gleichzeitig der DORA-Audit-Trail.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Sicherheit auf Speicher-Ebene (ADLS)</div>
+    <div class="grid-4">
+      <div class="card card-gray">
+        <h3>Verschlüsselung</h3>
+        <ul>
+          <li>At rest: AES-256</li>
+          <li>In transit: TLS 1.2+</li>
+          <li>Azure-managed keys (Standard)</li>
+          <li>Customer-managed keys möglich</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Zugriffskontrolle</h3>
+        <ul>
+          <li>Azure RBAC auf Storage-Ebene</li>
+          <li>ACLs auf Ordner-/Datei-Ebene</li>
+          <li>Service Principal für Pipelines</li>
+          <li>Managed Identity bevorzugt</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Netzwerk</h3>
+        <ul>
+          <li>Private Endpoints (kein Public Access)</li>
+          <li>VNet-Integration</li>
+          <li>Firewall-Regeln pro IP-Range</li>
+          <li>Service Endpoints</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Audit</h3>
+        <ul>
+          <li>Azure Storage Diagnostic Logs</li>
+          <li>Jeder Zugriff protokolliert</li>
+          <li>An Log Analytics weitergeleitet</li>
+          <li>DORA-konform</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 5</span><span>Seite 2 — Purview, Unity Catalog, Monitoring, ADLS-Sicherheit</span></div>
+</div>
+
+<!-- SEITE 3: Master-Cheat-Sheet & Alle Essentiellen Sätze -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Master-Cheat-Sheet</h1><div class="subtitle">dispDB Gesamtarchitektur · Alle essentiellen Sätze · Begriffe auf einen Blick</div></div>
+    <div class="badge">Seite 3 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">dispDB — Gesamtarchitektur auf einen Blick</div>
+    <table>
+      <tr><th style="width:20%">Schicht</th><th style="width:25%">Technologie</th><th style="width:25%">Aufgabe</th><th style="width:30%">Governance</th></tr>
+      <tr><td><strong>Ingest</strong></td><td>Fabric Data Factory + SHIR</td><td>AS/400 + Oracle → ADLS Landing</td><td>Workspace Roles, Key Vault, DORA Audit</td></tr>
+      <tr><td><strong>Bronze</strong></td><td>Databricks + Delta Lake</td><td>Rohdaten, Schema Evolution, Quarantäne</td><td>Unity Catalog ACLs, Column Masks</td></tr>
+      <tr><td><strong>Silver</strong></td><td>Databricks + Delta Lake</td><td>Bereinigung, Harmonisierung, Validierung</td><td>Unity Catalog Row Filters, Audit Logs</td></tr>
+      <tr><td><strong>Gold</strong></td><td>Databricks + Delta Lake (External Tables)</td><td>Aggregation, fachliche Modellierung</td><td>Unity Catalog, Sensitivity Labels, Purview Lineage</td></tr>
+      <tr><td><strong>Reporting</strong></td><td>Fabric Power BI + DirectLake</td><td>Semantic Model + Vorstandsreport</td><td>Workspace Roles, RLS, Sensitivity Labels</td></tr>
+      <tr><td><strong>Governance</strong></td><td>Purview + Unity Catalog + Azure Monitor</td><td>Lineage, Catalog, Audit Trail</td><td>DORA-Nachweis, BaFin-Compliance</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Essentielle Sätze — vollständige Sammlung</div>
+    <div class="essential"><strong>Satz 1 (Woche 1):</strong> „Ein Lakehouse ist ein Warehouse mit Superkräften — es kann alles was ein Warehouse kann (SQL), aber zusätzlich auch Spark, Python und rohe Dateizugriffe."</div>
+    <div class="essential"><strong>Satz 2 (Woche 3):</strong> „Parquet ist das Dateiformat. Delta Lake ist Parquet plus Transaction Log — und damit der Unterschied zwischen einem dummen Dateisystem und einer echten Datenbank."</div>
+    <div class="essential"><strong>Satz 3 (Woche 3):</strong> „Bronze speichert was kam. Silver speichert was stimmt. Gold speichert was gebraucht wird."</div>
+    <div class="essential"><strong>Satz 4 (Woche 3):</strong> „Spark ist der Motor, Databricks ist das Auto, Delta Lake ist die Straße — und Fabric liefert den Treibstoff (Rohdaten) und zeigt das Ziel an (Power BI)."</div>
+    <div class="essential"><strong>Satz 5 (Woche 3):</strong> „Delta Lake Time Travel ist wie Git für Datentabellen — jeder Schreibvorgang ist ein Commit, und du kannst jeden historischen Stand wiederherstellen. Aber ohne Branches, und mit automatischem Verfallsdatum."</div>
+    <div class="essential"><strong>Satz 6 (Woche 4):</strong> „DirectLake ist die Synthese aus Import (schnell) und DirectQuery (aktuell) — ohne die Nachteile beider. Er liest Delta-Dateien direkt aus OneLake, ohne Datenmove und ohne Refresh-Zyklus. Nur in Fabric verfügbar."</div>
+    <div class="essential"><strong>Satz 7 (Woche 5):</strong> „Governance ist kein Projekt-Anhang — es ist eine Schicht die von Anfang an mitgebaut wird. DORA belohnt wer das von Tag 1 ernst nimmt."</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Alle Kernbegriffe — Crashkurs-Glossar</div>
+    <div class="grid-2">
+      <table>
+        <tr><th>Begriff</th><th>Definition</th></tr>
+        <tr><td><strong>OneLake</strong></td><td>Einziger Data Lake pro Fabric-Tenant — Fundament aller Engines</td></tr>
+        <tr><td><strong>Lakehouse</strong></td><td>OneLake + Delta Lake + SQL Endpoint — Warehouse mit Superkräften</td></tr>
+        <tr><td><strong>Delta Lake</strong></td><td>Parquet + Transaction Log = ACID + Time Travel + Schema Evolution</td></tr>
+        <tr><td><strong>Medallion</strong></td><td>Bronze (roh) → Silver (bereinigt) → Gold (business-ready)</td></tr>
+        <tr><td><strong>SHIR</strong></td><td>Self-hosted Integration Runtime — Brücke zu Legacy-Quellen</td></tr>
+        <tr><td><strong>Shortcut</strong></td><td>Virtueller Zeiger auf ADLS — kein Datenmove</td></tr>
+        <tr><td><strong>DirectLake</strong></td><td>Power BI liest Delta direkt — schnell UND aktuell</td></tr>
+        <tr><td><strong>Semantic Model</strong></td><td>Abstraktionsschicht — Vertrag zwischen Data Team und Business</td></tr>
+      </table>
+      <table>
+        <tr><th>Begriff</th><th>Definition</th></tr>
+        <tr><td><strong>Measure (DAX)</strong></td><td>Dynamische Kennzahl — filterabhängig, zur Abfragezeit</td></tr>
+        <tr><td><strong>Unity Catalog</strong></td><td>Databricks Governance — Catalog/Schema/Table + ACLs</td></tr>
+        <tr><td><strong>Purview</strong></td><td>Microsoft Governance — Catalog, Lineage, Sensitivity Labels</td></tr>
+        <tr><td><strong>DORA</strong></td><td>Regulierung für ICT-Resilienz in Finanzinstituten (seit Jan 2025)</td></tr>
+        <tr><td><strong>RTO/RPO</strong></td><td>Recovery Time/Point Objective — wie schnell/aktuell nach Ausfall</td></tr>
+        <tr><td><strong>External Table</strong></td><td>Zeigt auf ADLS-Pfad — nötig für Fabric-Shortcut auf Gold Layer</td></tr>
+        <tr><td><strong>Time Travel</strong></td><td>Historischen Tabellenstand abrufen — wie Git für Daten</td></tr>
+        <tr><td><strong>VACUUM</strong></td><td>Löscht alte Delta-Dateien — beeinflusst Time-Travel-Reichweite</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 5 — Abschluss</span><span>Seite 3 — Master-Cheat-Sheet, Essentielle Sätze, Glossar</span></div>
+</div>
+
+</body>
+</html>
