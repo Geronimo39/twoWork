@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP-700 Crashkurs — Tag 4</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f6e56; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #0f6e56; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #0f6e56; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f6e56; border-left: 4px solid #0f6e56; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #0a6e51; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .exam-note { background: #e8f2fb; border: 1px solid #90c0ea; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #0d4a8a; margin-top: 8px; }
+  .exam-note strong { color: #185fa5; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0f6e56; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.7; }
+  .kql-block { background: #f0f4ff; border: 1px solid #90c0ea; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #1a1a4a; margin: 4px 0; line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-blue{background:#d4e8f8;color:#185fa5;}
+  .tag-coral{background:#fbe0d4;color:#8a3318;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Spark & PySpark -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 4</h1><div class="subtitle">Spark/PySpark Konzepte · Delta Lake Operationen · KQL Einstieg</div></div>
+    <div class="badge">Seite 1 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Spark — Lazy Evaluation &amp; Execution Plan</div>
+    <div class="highlight"><strong>Wichtigstes Spark-Konzept:</strong> Transformationen sind <strong>lazy</strong> — sie werden nicht sofort ausgeführt, sondern zu einem Execution Plan zusammengebaut. Erst eine <strong>Action</strong> (.write(), .show(), .count()) löst die Ausführung aus.</div>
+    <div class="grid-2">
+      <div>
+        <div class="code-block">
+# LAZY — passiert noch NICHTS<br>
+df = spark.read.format("delta")<br>
+&nbsp;&nbsp;.load("abfss://bronze/buchungen/")<br>
+df_filtered = df.filter(df.status == "aktiv")<br>
+df_renamed = df_filtered<br>
+&nbsp;&nbsp;.withColumnRenamed("betrag", "amount")<br>
+<br>
+# ACTION — erst HIER wird alles ausgeführt<br>
+df_renamed.write.format("delta")<br>
+&nbsp;&nbsp;.mode("overwrite")<br>
+&nbsp;&nbsp;.save("abfss://silver/buchungen/")
+        </div>
+      </div>
+      <div class="card card-teal">
+        <h3>Wichtige DataFrame-Operationen</h3>
+        <ul>
+          <li><code>filter(df.col == val)</code> — Zeilen filtern</li>
+          <li><code>select("col1", "col2")</code> — Spalten auswählen</li>
+          <li><code>withColumn("neu", expr)</code> — Neue Spalte</li>
+          <li><code>withColumnRenamed("alt","neu")</code> — Umbenennen</li>
+          <li><code>dropDuplicates(["id"])</code> — Duplikate entfernen</li>
+          <li><code>groupBy("col").agg(sum("betrag"))</code> — Aggregieren</li>
+          <li><code>createOrReplaceTempView("name")</code> — SQL-View</li>
+          <li><code>spark.sql("SELECT ...")</code> — SQL auf View</li>
+        </ul>
+        <div style="margin-top:4px"><span class="tag tag-teal">Alle oben: lazy (Transformation)</span></div>
+        <div style="margin-top:2px"><span class="tag tag-coral">.write(), .show(), .count(): Action!</span></div>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Lazy Evaluation erlaubt Spark den gesamten Transformationspfad zu optimieren — z.B. Filter früh anwenden (Predicate Pushdown) um weniger Daten zu lesen. Das ist der Hauptgrund warum Spark so performant ist.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Delta Lake Operationen — OPTIMIZE, VACUUM, Z-ORDER</div>
+    <div class="grid-3">
+      <div class="card card-purple">
+        <h3>OPTIMIZE — Dateien kompaktieren</h3>
+        <ul>
+          <li>Delta schreibt viele kleine Parquet-Dateien</li>
+          <li>OPTIMIZE fasst sie zu größeren zusammen</li>
+          <li>Verbessert Leseperformance erheblich</li>
+          <li>Empfohlen: wöchentlich ausführen</li>
+        </ul>
+        <div class="code-block">
+dt = DeltaTable.forPath(spark, "abfss://...")<br>
+dt.optimize().executeCompaction()
+        </div>
+      </div>
+      <div class="card card-amber">
+        <h3>VACUUM — alte Dateien löschen</h3>
+        <ul>
+          <li>Löscht Dateien nicht mehr im Transaction Log</li>
+          <li>Direkte Auswirkung auf Time Travel!</li>
+          <li>Standard: 7 Tage Retention</li>
+          <li>DORA: Retention bewusst setzen!</li>
+        </ul>
+        <div class="code-block">
+dt.vacuum(retentionHours=168)<br>
+# 168h = 7 Tage
+        </div>
+      </div>
+      <div class="card card-blue">
+        <h3>Z-ORDER — Clustering</h3>
+        <ul>
+          <li>Sortiert Daten physisch nach Spalten</li>
+          <li>Abfragen mit diesen Filtern → viel schneller</li>
+          <li>Für Gold Layer sehr relevant</li>
+          <li>Kombinierbar mit OPTIMIZE</li>
+        </ul>
+        <div class="code-block">
+dt.optimize()<br>
+&nbsp;&nbsp;.executeZOrderBy(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"buchung_datum", "region")
+        </div>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Gold Layer:</strong> OPTIMIZE + Z-ORDER nach <code>buchung_datum</code> und <code>region</code> wöchentlich ausführen → Power BI DirectLake-Abfragen werden deutlich schneller. VACUUM: mind. 30 Tage Retention für DORA-Compliance.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Streaming vs. Batch — wann welches?</div>
+    <div class="grid-2">
+      <div class="card card-green">
+        <h3>Batch Processing (dispDB)</h3>
+        <ul>
+          <li>Daten in Intervallen geladen (täglich, stündlich)</li>
+          <li>Latenz: Minuten bis Stunden — akzeptabel</li>
+          <li>Werkzeuge: Pipelines, Notebooks, Dataflows Gen2</li>
+          <li>Geeignet für: Finanzberichte, KPIs, historische Analysen</li>
+          <li><strong>dispDB: richtige Wahl</strong> — Versicherungsdaten brauchen keine Echtzeit</li>
+        </ul>
+      </div>
+      <div class="card card-coral">
+        <h3>Streaming Processing</h3>
+        <ul>
+          <li>Kontinuierliche Verarbeitung (ms–Sekunden)</li>
+          <li>Latenz: nahezu Echtzeit</li>
+          <li>Werkzeuge: Real-Time Intelligence (Eventstream), Structured Streaming</li>
+          <li>Geeignet für: Fraud Detection, IoT, Live-Dashboards</li>
+          <li>Für dispDB Phase I: nicht relevant</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Du musst begründen können <em>warum</em> Batch oder Streaming — nicht nur <em>dass</em>. Batch für dispDB: Versicherungsdaten ändern sich nicht so schnell dass Echtzeit nötig wäre, und regulierte Berichte basieren auf tagesabgeschlossenen Daten.</div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 4</span><span>Seite 1 — Spark, Delta Lake Operationen, Streaming vs. Batch</span></div>
+</div>
+
+<!-- SEITE 2: KQL -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 4</h1><div class="subtitle">KQL — Kusto Query Language · Operatoren · Vergleich mit SQL · Prüfungs-Quickref</div></div>
+    <div class="badge">Seite 2 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">KQL — Kusto Query Language</div>
+    <div class="highlight"><strong>Wofür:</strong> KQL ist die Abfragesprache für <strong>Real-Time Intelligence</strong> in Fabric (früher Azure Data Explorer). Pipe-basiert, read-only, optimiert für Zeitreihen und Logs. Das größte neue Lernfeld des DP-700!</div>
+    <div class="grid-2">
+      <div>
+        <div class="kql-block">
+// Grundstruktur: Tabelle | Operator | Operator<br>
+Buchungen<br>
+| where Datum &gt;= ago(7d)<br>
+| where Region == "Nord"<br>
+| summarize Gesamt = sum(Betrag)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;by Region, bin(Datum, 1d)<br>
+| order by Datum desc<br>
+| take 100
+        </div>
+        <div class="kql-block" style="margin-top:8px">
+// Zeitbasierte Abfragen<br>
+Events<br>
+| where Timestamp &gt;= ago(24h)<br>
+| where Level == "Error"<br>
+| summarize Count = count()<br>
+&nbsp;&nbsp;&nbsp;&nbsp;by bin(Timestamp, 1h), Source<br>
+| render timechart
+        </div>
+        <div class="kql-block" style="margin-top:8px">
+// Join in KQL<br>
+Buchungen<br>
+| join kind=inner Kunden<br>
+&nbsp;&nbsp;on KundeId<br>
+| project BuchungId, Betrag,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;KundeName, Region
+        </div>
+      </div>
+      <div>
+        <div class="card card-blue">
+          <h3>Wichtige KQL-Operatoren</h3>
+          <table style="margin-top:4px">
+            <tr><th>Operator</th><th>Was er tut</th><th>SQL-Analogie</th></tr>
+            <tr><td><code>where</code></td><td>Zeilen filtern</td><td>WHERE</td></tr>
+            <tr><td><code>project</code></td><td>Spalten auswählen</td><td>SELECT col</td></tr>
+            <tr><td><code>extend</code></td><td>Neue Spalte</td><td>SELECT col AS</td></tr>
+            <tr><td><code>summarize</code></td><td>Aggregieren</td><td>GROUP BY</td></tr>
+            <tr><td><code>order by</code></td><td>Sortieren</td><td>ORDER BY</td></tr>
+            <tr><td><code>take</code></td><td>Erste N Zeilen</td><td>TOP / LIMIT</td></tr>
+            <tr><td><code>join</code></td><td>Tabellen verbinden</td><td>JOIN</td></tr>
+            <tr><td><code>union</code></td><td>Tabellen stapeln</td><td>UNION</td></tr>
+            <tr><td><code>ago(7d)</code></td><td>Relative Zeit zurück</td><td>DATEADD</td></tr>
+            <tr><td><code>bin(col, 1h)</code></td><td>Zeitfenster</td><td>DATETRUNC</td></tr>
+            <tr><td><code>render</code></td><td>Visualisierung</td><td>—</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">KQL vs. SQL — die wichtigsten Unterschiede</div>
+    <div class="grid-2">
+      <div class="card card-coral">
+        <h3>KQL — Besonderheiten</h3>
+        <ul>
+          <li><strong>Immer read-only</strong> — kein INSERT, UPDATE, DELETE</li>
+          <li><strong>Pipe-basiert</strong> — jeder Operator bekommt Output des vorherigen</li>
+          <li><strong>Eingebaute Zeitfunktionen</strong> — <code>ago()</code>, <code>bin()</code>, <code>startofday()</code></li>
+          <li><strong>Case-sensitive</strong> bei Spalten- und Tabellennamen</li>
+          <li><strong>render</strong> — direkte Visualisierung im Query-Ergebnis</li>
+          <li>Optimiert für Zeitreihen und Logs (nicht für transaktionale Daten)</li>
+        </ul>
+      </div>
+      <div class="card card-coral">
+        <h3>Häufige KQL-Fallstricke (Prüfung!)</h3>
+        <ul>
+          <li><code>where</code> statt <code>WHERE</code> — lowercase!</li>
+          <li><code>==</code> für Gleichheit, nicht <code>=</code></li>
+          <li><code>!=</code> für Ungleichheit, nicht <code>&lt;&gt;</code></li>
+          <li><code>contains</code> statt <code>LIKE '%text%'</code></li>
+          <li><code>startswith</code> statt <code>LIKE 'text%'</code></li>
+          <li>Strings: <code>"doppelte Anführungszeichen"</code></li>
+          <li>Reihenfolge: <code>summarize</code> kommt <em>nach</em> <code>where</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tag 4 — Begriffe &amp; Prüfungs-Quickref</div>
+    <div class="grid-2">
+      <table>
+        <tr><th>Begriff</th><th>Definition</th></tr>
+        <tr><td><strong>Lazy Evaluation</strong></td><td>Spark-Transformationen werden nicht sofort ausgeführt — erst bei einer Action</td></tr>
+        <tr><td><strong>Action (Spark)</strong></td><td>.write(), .show(), .count() — löst Ausführung des Execution Plans aus</td></tr>
+        <tr><td><strong>Predicate Pushdown</strong></td><td>Spark wendet Filter früh an um weniger Daten zu lesen — durch Lazy Evaluation möglich</td></tr>
+        <tr><td><strong>OPTIMIZE</strong></td><td>Delta-Befehl: kleine Parquet-Dateien zu größeren zusammenfassen → Leseperformance</td></tr>
+        <tr><td><strong>VACUUM</strong></td><td>Delta-Befehl: alte unreferenzierte Dateien löschen → beeinflusst Time Travel</td></tr>
+        <tr><td><strong>Z-ORDER</strong></td><td>Delta-Clustering: Daten physisch nach Spalten sortieren → Filterabfragen schneller</td></tr>
+        <tr><td><strong>KQL</strong></td><td>Kusto Query Language — pipe-basiert, read-only, für Real-Time Intelligence</td></tr>
+        <tr><td><strong>ago(7d)</strong></td><td>KQL-Funktion: relativer Zeitraum zurück (7 Tage, 1h, 30min etc.)</td></tr>
+        <tr><td><strong>bin(col, 1h)</strong></td><td>KQL-Funktion: Werte in Zeitfenster gruppieren</td></tr>
+        <tr><td><strong>summarize</strong></td><td>KQL-Aggregation — Analogie zu SQL GROUP BY</td></tr>
+        <tr><td><strong>render</strong></td><td>KQL-Operator: direkte Visualisierung (timechart, barchart etc.)</td></tr>
+      </table>
+      <div class="card card-amber">
+        <h3>Typische Prüfungsfragen Tag 4</h3>
+        <ul>
+          <li>"Was ist Lazy Evaluation?" → Transformationen werden erst bei Action ausgeführt</li>
+          <li>"Was löst die Spark-Ausführung aus?" → Actions: .write(), .show(), .count()</li>
+          <li>"OPTIMIZE wofür?" → kleine Delta-Dateien kompaktieren → Leseperformance</li>
+          <li>"VACUUM Auswirkung?" → löscht alte Dateien → Time Travel eingeschränkt</li>
+          <li>"Z-ORDER wofür?" → physisches Clustering → Filterabfragen schneller</li>
+          <li>"KQL read-only?" → Ja — kein INSERT/UPDATE/DELETE</li>
+          <li>"KQL Gleichheitsoperator?" → == (nicht =)</li>
+          <li>"ago(7d) bedeutet?" → die letzten 7 Tage relativ zu jetzt</li>
+          <li>"Wann Streaming statt Batch?" → Echtzeit nötig: Fraud Detection, IoT</li>
+          <li>"Warum Batch für dispDB?" → Versicherungsdaten brauchen keine Echtzeit, regulierte Berichte tagesabgeschlossen</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 4</span><span>Seite 2 — KQL Operatoren, KQL vs. SQL, Begriffe, Prüfungs-Quickref</span></div>
+</div>
+
+</body>
+</html>
