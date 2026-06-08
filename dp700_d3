@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP-700 Crashkurs — Tag 3</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f6e56; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #0f6e56; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #0f6e56; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f6e56; border-left: 4px solid #0f6e56; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #0a6e51; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .exam-note { background: #e8f2fb; border: 1px solid #90c0ea; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #0d4a8a; margin-top: 8px; }
+  .exam-note strong { color: #185fa5; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0f6e56; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-blue{background:#d4e8f8;color:#185fa5;} .tag-coral{background:#fbe0d4;color:#8a3318;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .lademuster-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .lm-append  { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px 0 0 8px; padding: 10px 12px; }
+  .lm-overwrite { background: #fdf5e6; border-top: 1px solid #f5cc7a; border-bottom: 1px solid #f5cc7a; border-left: none; border-right: none; padding: 10px 12px; }
+  .lm-merge   { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 0 8px 8px 0; padding: 10px 12px; }
+  .lm-append h3  { color: #0a6e51; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .lm-overwrite h3 { color: #7a4a08; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .lm-merge h3   { color: #4a2fa0; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .lm-append li, .lm-overwrite li, .lm-merge li { font-size: 11px; color: #444; line-height: 1.55; }
+  .lm-append ul, .lm-overwrite ul, .lm-merge ul { padding-left: 14px; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 3</h1><div class="subtitle">Lakehouse-Lademuster · MERGE INTO · Dataflow Gen2 · Inkrementeller Load</div></div>
+    <div class="badge">Seite 1 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Lakehouse-Lademuster — APPEND, OVERWRITE, MERGE</div>
+    <div class="lademuster-grid">
+      <div class="lm-append">
+        <h3>APPEND</h3>
+        <ul>
+          <li>Neue Zeilen werden hinzugefügt</li>
+          <li>Bestehende Daten bleiben unverändert</li>
+          <li>✓ Delta Loads (Bewegungsdaten)</li>
+          <li>✓ Einfach und schnell</li>
+          <li>✗ Keine Updates möglich</li>
+          <li>✗ <strong>Nicht idempotent!</strong></li>
+          <li>✗ Bei Retry: Duplikate!</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-teal">dispDB: Bronze Layer</span></div>
+      </div>
+      <div class="lm-overwrite">
+        <h3>OVERWRITE</h3>
+        <ul>
+          <li>Alle Daten werden ersetzt</li>
+          <li>Alte Daten werden gelöscht</li>
+          <li>✓ Full Loads (Samstags-Load)</li>
+          <li>✓ Kleine Stammdaten-Tabellen</li>
+          <li>✓ Idempotent</li>
+          <li>✗ Datenverlust-Risiko</li>
+          <li>✗ Nicht für große Tabellen</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-amber">dispDB: Stammdaten, Full Load</span></div>
+      </div>
+      <div class="lm-merge">
+        <h3>MERGE / UPSERT</h3>
+        <ul>
+          <li>PK-Vergleich: Treffer → UPDATE</li>
+          <li>Kein Treffer → INSERT</li>
+          <li>Optional: nicht in Quelle → DELETE</li>
+          <li>✓ Delta Loads mit Updates</li>
+          <li>✓ <strong>Idempotent!</strong></li>
+          <li>✓ Sicherster Weg</li>
+          <li>✗ Aufwändiger als APPEND</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-purple">dispDB: Silver Layer</span></div>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp Idempotenz:</strong> APPEND ist NICHT idempotent (Retry → Duplikate). OVERWRITE und MERGE sind idempotent. Für Retry-Mechanismen in Pipelines immer MERGE oder OVERWRITE bevorzugen!</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">MERGE INTO in Delta Lake — Syntax &amp; Klauseln</div>
+    <div class="grid-2">
+      <div>
+        <div class="code-block">
+MERGE INTO silver.buchungen AS target<br>
+USING bronze.buchungen_neu AS source<br>
+ON target.buchung_id = source.buchung_id<br>
+<br>
+WHEN MATCHED THEN<br>
+&nbsp;&nbsp;UPDATE SET<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target.betrag = source.betrag,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target.status = source.status,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;target.updated_at = source.updated_at<br>
+<br>
+WHEN NOT MATCHED THEN<br>
+&nbsp;&nbsp;INSERT (buchung_id, betrag, status,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;created_at, updated_at)<br>
+&nbsp;&nbsp;VALUES (source.buchung_id, source.betrag,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;source.status, source.created_at,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;source.updated_at)<br>
+<br>
+WHEN NOT MATCHED BY SOURCE THEN<br>
+&nbsp;&nbsp;DELETE -- optional: Soft-Delete
+        </div>
+      </div>
+      <div>
+        <div class="card card-purple">
+          <h3>Drei MERGE-Klauseln</h3>
+          <ul>
+            <li><strong>WHEN MATCHED:</strong> Zeile in Quelle UND Ziel → UPDATE</li>
+            <li><strong>WHEN NOT MATCHED:</strong> Zeile nur in Quelle → INSERT (neu)</li>
+            <li><strong>WHEN NOT MATCHED BY SOURCE:</strong> Zeile nur im Ziel, nicht mehr in Quelle → DELETE (optional)</li>
+          </ul>
+        </div>
+        <div class="card card-purple" style="margin-top:8px">
+          <h3>Warum MERGE idempotent ist</h3>
+          <ul>
+            <li>PK-Vergleich verhindert Duplikate auch bei Retry</li>
+            <li>Zweiter Lauf: MATCHED → UPDATE (kein Insert-Duplikat)</li>
+            <li>Ergebnis ist immer dasselbe — egal wie oft ausgeführt</li>
+            <li>Ideal für Retry-Mechanismen in Pipelines</li>
+          </ul>
+        </div>
+        <div class="dispdb-note" style="margin-top:8px"><strong>dispDB Silver Layer:</strong> MERGE INTO mit <code>buchung_id</code> als Join-Key. Bronze → Silver: alle geänderten Buchungen werden korrekt aktualisiert, neue eingefügt. Retry-sicher!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Dataflow Gen2 — tiefer als Tag 1</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Was Dataflow Gen2 technisch ist</h3>
+        <ul>
+          <li>Basiert auf Power Query (M-Sprache)</li>
+          <li>Visuelle Oberfläche → M-Code wird generiert</li>
+          <li>Dieselbe Engine wie Excel &amp; Power BI Desktop</li>
+          <li><strong>Staging Lakehouse:</strong> temporäres Zwischenlager</li>
+          <li>Verbessert Performance: Quelle → Staging → Ziel</li>
+          <li>Nicht Staging → direkt: Quelle → Ziel (einfacher)</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Wann Dataflow Gen2 statt Notebook</h3>
+        <ul>
+          <li>300+ Power Query-Konnektoren verfügbar</li>
+          <li>Transformation einfach (Filter, Rename, Join, Cast)</li>
+          <li>Team hat Analysten ohne PySpark-Kenntnisse</li>
+          <li>Datenmenge überschaubar (kein Terabyte-Bereich)</li>
+          <li><strong>Nicht geeignet:</strong> Delta MERGE, komplexe Logik, Massendaten</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:8px">
+      <div>
+        <table>
+          <tr><th></th><th>Gen1 (Legacy)</th><th>Gen2 (Neu)</th></tr>
+          <tr><td><strong>Ziel</strong></td><td>Power BI Datasets</td><td>Fabric Lakehouses, Warehouses</td></tr>
+          <tr><td><strong>Staging</strong></td><td>Nein</td><td>Ja (Lakehouse)</td></tr>
+          <tr><td><strong>DirectLake</strong></td><td>Nein</td><td>Ja</td></tr>
+          <tr><td><strong>Empfehlung</strong></td><td>Legacy</td><td>Neu verwenden</td></tr>
+        </table>
+      </div>
+      <div class="card card-teal">
+        <h3>Inkrementeller Load in Dataflow Gen2</h3>
+        <ul>
+          <li>Nativ unterstützt — kein PySpark nötig</li>
+          <li><strong>Row Date Column:</strong> Timestamp-Spalte definieren</li>
+          <li><strong>Range Start:</strong> z.B. 3 Tage Überlappung für Sicherheit</li>
+          <li><strong>Detect Data Changes:</strong> prüft ob Änderungen vorliegen</li>
+          <li>Funktioniert nur mit zuverlässiger Timestamp-Spalte!</li>
+          <li><span class="tag tag-amber">Voraussetzung: Timestamp-Klärung mit IT</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 3</span><span>Seite 1 — Lademuster, MERGE INTO, Dataflow Gen2</span></div>
+</div>
+
+<!-- SEITE 2 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 3</h1><div class="subtitle">Copy Activity Partitionierung · Fehlerbehandlung · Idempotenz · Begriffe</div></div>
+    <div class="badge">Seite 2 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Copy Activity — Partitionierungsoptionen</div>
+    <div class="highlight"><strong>Ziel der Partitionierung:</strong> Mehrere parallele Datenbankverbindungen öffnen → Ingest-Throughput erhöhen. Für große AS/400- und Oracle-Tabellen entscheidend.</div>
+    <table>
+      <tr><th style="width:22%">Option</th><th style="width:35%">Wie es funktioniert</th><th style="width:22%">Wann verwenden</th><th style="width:21%">dispDB</th></tr>
+      <tr><td><strong>None</strong></td><td>Eine Verbindung, sequenziell alles lesen</td><td>Kleine Tabellen (&lt; 1M Zeilen)</td><td>Stammdaten</td></tr>
+      <tr><td><strong>Physical Partitions</strong></td><td>Nutzt vorhandene DB-Partitionen der Quelle</td><td>Oracle mit bestehender Partitionierung</td><td>Oracle wenn partitioniert</td></tr>
+      <tr><td><strong>Dynamic Range</strong></td><td>Wertebereich aufteilen: Min/Max + Anzahl Partitionen → parallele Verbindungen</td><td>Große Tabellen, kontrollierte Lastverteilung</td><td><span class="tag tag-green">Empfohlen für AS/400 + Oracle</span></td></tr>
+      <tr><td><strong>Column</strong></td><td>Wie Dynamic Range, aber Min/Max automatisch berechnet (Extra-Abfrage)</td><td>Wenn Min/Max unbekannt</td><td>Fallback zu Dynamic Range</td></tr>
+    </table>
+    <div class="code-block" style="margin-top:8px">
+// Dynamic Range Beispiel für dispDB (buchung_id als Partition Column)<br>
+Spalte: buchung_id · Min: 1 · Max: 10.000.000 · Partitionen: 10<br>
+→ 10 parallele Verbindungen, je ~1M Zeilen · SHIR öffnet 10 DB-Connections gleichzeitig
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Dynamic Range ist die flexibelste Option — du kontrollierst Min/Max und Anzahl Partitionen explizit. Physical Partitions ist effizienter wenn die Quelle bereits partitioniert ist. None nur für kleine Tabellen.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Fehlerbehandlung &amp; Idempotenz — vertieft</div>
+    <div class="grid-2">
+      <div class="card card-coral">
+        <h3>Retry-Policy in Pipelines</h3>
+        <ul>
+          <li><strong>Retry count:</strong> wie oft wiederholen (empfohlen: 2–3)</li>
+          <li><strong>Retry interval:</strong> Wartezeit zwischen Versuchen (5–10 Min.)</li>
+          <li><strong>Timeout:</strong> nach wie viel Zeit abbrechen</li>
+          <li>onSuccess → nächste Activity</li>
+          <li>onFailure → Benachrichtigung / Eskalation</li>
+          <li>onCompletion → immer (Logging)</li>
+        </ul>
+      </div>
+      <div class="card card-coral">
+        <h3>Fault Tolerance in Copy Activity</h3>
+        <ul>
+          <li><strong>Stop on first error:</strong> Pipeline stoppt bei erstem Fehler</li>
+          <li><strong>Continue:</strong> fehlerhafte Sätze überspringen, in Log-Datei schreiben</li>
+          <li><strong>Skip incompatible rows:</strong> Typkonflikte überspringen</li>
+          <li><span class="tag tag-coral">Finanzdaten: immer "Stop on first error"!</span></li>
+          <li>Übersprungene Sätze → Bronze/quarantine/</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-3" style="margin-top:8px">
+      <div class="card card-amber">
+        <h3>APPEND — nicht idempotent</h3>
+        <ul>
+          <li>Bei Retry: Zeilen werden doppelt eingefügt</li>
+          <li>Lösung 1: Staging + MERGE</li>
+          <li>Lösung 2: Deduplizierung in Silver</li>
+          <li>Bronze Layer: akzeptabel wenn Silver dedupliziert</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>OVERWRITE — idempotent</h3>
+        <ul>
+          <li>Mehrfaches Ausführen: immer dasselbe Ergebnis</li>
+          <li>Retry problemlos</li>
+          <li>Aber: ganzer Tabelleninhalt wird ersetzt</li>
+          <li>Nur für kleine / vollständig ersetzbare Tabellen</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>MERGE — idempotent</h3>
+        <ul>
+          <li>PK-Vergleich verhindert Duplikate</li>
+          <li>Zweiter Lauf: MATCHED → UPDATE statt INSERT</li>
+          <li>Sicherster Weg für inkrementelle Loads</li>
+          <li>Empfohlen für Silver und Gold Layer</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Retry-Strategie:</strong> Bronze APPEND → Silver dedupliziert via MERGE. Silver→Gold MERGE → idempotent. Full Load Samstag → OVERWRITE → idempotent. Alle Pipelines: 2 Retries, 5 Min. Intervall, onFailure → E-Mail.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tag 3 — Begriffe &amp; Prüfungs-Quickref</div>
+    <div class="grid-2">
+      <table>
+        <tr><th>Begriff</th><th>Definition</th></tr>
+        <tr><td><strong>APPEND</strong></td><td>Neue Zeilen hinzufügen — nicht idempotent, kein Update</td></tr>
+        <tr><td><strong>OVERWRITE</strong></td><td>Alles ersetzen — idempotent, Datenverlust-Risiko</td></tr>
+        <tr><td><strong>MERGE/UPSERT</strong></td><td>PK-Vergleich: Update bei Treffer, Insert bei Neu — idempotent</td></tr>
+        <tr><td><strong>WHEN MATCHED</strong></td><td>MERGE-Klausel: Zeile in Quelle UND Ziel → UPDATE</td></tr>
+        <tr><td><strong>WHEN NOT MATCHED</strong></td><td>MERGE-Klausel: Zeile nur in Quelle → INSERT</td></tr>
+        <tr><td><strong>WHEN NOT MATCHED BY SOURCE</strong></td><td>MERGE-Klausel: nur im Ziel → DELETE (optional)</td></tr>
+        <tr><td><strong>Idempotenz</strong></td><td>Mehrfaches Ausführen = immer dasselbe Ergebnis</td></tr>
+        <tr><td><strong>Dataflow Gen2</strong></td><td>Low-code Transformation auf Power Query (M) Basis</td></tr>
+        <tr><td><strong>Staging Lakehouse</strong></td><td>Temporäres Zwischenlager in Dataflow Gen2 für Performance</td></tr>
+        <tr><td><strong>Dynamic Range</strong></td><td>Copy Activity: Wertebereich aufteilen für parallele DB-Verbindungen</td></tr>
+        <tr><td><strong>Physical Partitions</strong></td><td>Copy Activity: vorhandene DB-Partitionen der Quelle nutzen</td></tr>
+        <tr><td><strong>Fault Tolerance</strong></td><td>Verhalten bei fehlerhaften Zeilen: Stop / Continue / Skip</td></tr>
+      </table>
+      <div>
+        <div class="card card-amber">
+          <h3>Typische Prüfungsfragen Tag 3</h3>
+          <ul>
+            <li>"Welches Lademuster für Delta Loads mit Updates?" → MERGE</li>
+            <li>"Welches Lademuster ist idempotent?" → OVERWRITE und MERGE</li>
+            <li>"WHEN NOT MATCHED BY SOURCE wofür?" → DELETE von Zeilen die in Quelle nicht mehr existieren</li>
+            <li>"Dataflow Gen2 Staging wofür?" → Performance-Verbesserung bei der Transformation</li>
+            <li>"Copy Activity Partitionierung für große Oracle-Tabellen?" → Dynamic Range oder Physical Partitions</li>
+            <li>"Fault Tolerance für Finanzdaten?" → Stop on first error</li>
+            <li>"APPEND + Retry = Problem?" → Duplikate → Lösung: MERGE in Silver</li>
+          </ul>
+        </div>
+        <div class="warn-note" style="margin-top:8px"><strong>dispDB-Erinnerung:</strong> Timestamp-Spalten in AS/400 und Oracle müssen noch mit IT-Infrastruktur-Kollegen geklärt werden — das ist Voraussetzung für inkrementellen Load in Dataflow Gen2 und Tumbling Window Trigger!</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 3</span><span>Seite 2 — Partitionierung, Fehlerbehandlung, Idempotenz, Begriffe</span></div>
+</div>
+
+</body>
+</html>
