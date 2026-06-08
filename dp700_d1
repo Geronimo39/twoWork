@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP-700 Crashkurs — Tag 1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f6e56; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #0f6e56; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #0f6e56; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f6e56; border-left: 4px solid #0f6e56; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #0a6e51; }
+  .essential { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #3c3489; margin-bottom: 6px; font-style: italic; }
+  .essential strong { color: #4a2fa0; font-style: normal; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  .exam-note { background: #e8f2fb; border: 1px solid #90c0ea; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #0d4a8a; margin-top: 8px; }
+  .exam-note strong { color: #185fa5; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0f6e56; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-blue{background:#d4e8f8;color:#185fa5;} .tag-gray{background:#ebebeb;color:#444;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .tool-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .tool-pipeline { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 8px 0 0 8px; padding: 10px 12px; }
+  .tool-dataflow { background: #e8f7f2; border-top: 1px solid #7dd4b8; border-bottom: 1px solid #7dd4b8; border-left: none; border-right: none; padding: 10px 12px; }
+  .tool-notebook { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 0 8px 8px 0; padding: 10px 12px; }
+  .tool-pipeline h3 { color: #4a2fa0; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .tool-dataflow h3 { color: #0a6e51; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .tool-notebook h3 { color: #7a4a08; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .tool-pipeline li, .tool-dataflow li, .tool-notebook li { font-size: 11px; color: #444; line-height: 1.55; }
+  .tool-pipeline ul, .tool-dataflow ul, .tool-notebook ul { padding-left: 14px; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Workspace-Konfiguration & Orchestrierungswerkzeuge -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 1</h1><div class="subtitle">Workspace Setup · Orchestrierung · Git-Integration · Deployment Pipelines</div></div>
+    <div class="badge">Seite 1 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Workspace-Konfiguration — tiefer als Woche 1</div>
+    <div class="grid-3">
+      <div class="card card-teal">
+        <h3>Spark Settings</h3>
+        <ul>
+          <li><strong>Runtime Version:</strong> Spark/Delta Lake Version für alle Notebooks im Workspace</li>
+          <li><strong>Node Size Family:</strong> Memory Optimized vs. Compute Optimized</li>
+          <li><strong>Auto-stop:</strong> Idle-Timeout für Kostenkontrolle</li>
+          <li><strong>High Concurrency Mode:</strong> mehrere Nutzer teilen einen Cluster</li>
+          <li>Default gilt für alle Notebooks — einzelne Notebooks können überschreiben</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>OneLake Data Access Roles</h3>
+        <ul>
+          <li>Granulare Steuerung unterhalb der Workspace-Rollen-Ebene</li>
+          <li>Zugriff auf spezifische Ordner in OneLake steuerbar</li>
+          <li>z.B. Gruppe A sieht nur <code>bronze/as400/</code></li>
+          <li>Gruppe B sieht nur <code>gold/</code></li>
+          <li><strong>Delegated Access:</strong> externe Dienste (Databricks) erhalten autorisierten Zugriff auf OneLake</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Domain-Zugehörigkeit</h3>
+        <ul>
+          <li>Workspaces können einer Domain zugewiesen werden</li>
+          <li>Domain = thematische Gruppierung mehrerer Workspaces</li>
+          <li>z.B. "Finance-Domain" enthält dispDB + weitere Projekte</li>
+          <li>Governance-Richtlinien auf Domain-Ebene setzbar</li>
+          <li>Für dispDB Phase I: noch nicht kritisch</li>
+          <li><span class="tag tag-blue">Prüfungsrelevant: kennen, nicht vertiefen</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Spark Settings und OneLake Data Access Roles sind DP-700-Prüfungsstoff — insbesondere die Frage wann High Concurrency Mode sinnvoll ist (viele gleichzeitige Nutzer, interaktive Analysen) vs. wann nicht (dedizierte ETL-Jobs).</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Orchestrierungswerkzeuge — wann Pipeline, Dataflow Gen2 oder Notebook?</div>
+    <div class="highlight"><strong>Prüfungs-Faustregel:</strong> Pipeline = Dirigent (orchestriert). Dataflow Gen2 = Power Query in der Cloud (low-code, für Analysten). Notebook = volle Programmierfreiheit (PySpark, für Data Engineers). In der Praxis ruft die Pipeline Notebooks und Dataflows auf — sie schließen sich nicht aus.</div>
+    <div class="tool-grid">
+      <div class="tool-pipeline">
+        <h3>Pipeline</h3>
+        <ul>
+          <li>Orchestrierung &amp; Datenbewegung</li>
+          <li>✓ Copy Activity (SHIR, Legacy-Quellen)</li>
+          <li>✓ Aktivitäten sequenzieren</li>
+          <li>✓ Notebooks &amp; Dataflows aufrufen</li>
+          <li>✓ ForEach / If Condition</li>
+          <li>✓ Trigger &amp; Zeitpläne</li>
+          <li>✓ Fehlerbehandlung (onFailure)</li>
+          <li>✗ Kein Spark / keine Transformation</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-purple">dispDB: Ingest-Orchestrierung</span></div>
+      </div>
+      <div class="tool-dataflow">
+        <h3>Dataflow Gen2</h3>
+        <ul>
+          <li>Low-Code Transformation</li>
+          <li>✓ Power Query visuell (M-Sprache)</li>
+          <li>✓ 300+ Konnektoren</li>
+          <li>✓ Für Analysten ohne Code-Kenntnisse</li>
+          <li>✓ Ingest + Transform in einem Schritt</li>
+          <li>✓ Direkt in Lakehouse schreiben</li>
+          <li>✗ Langsamer als Spark</li>
+          <li>✗ Begrenzte Skalierung bei Big Data</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-teal">dispDB: für einfache Transforms</span></div>
+      </div>
+      <div class="tool-notebook">
+        <h3>Notebook (PySpark)</h3>
+        <ul>
+          <li>Code-basierte Transformation</li>
+          <li>✓ Volle PySpark-Power</li>
+          <li>✓ Delta Lake MERGE/UPDATE/DELETE</li>
+          <li>✓ ML-Integration möglich</li>
+          <li>✓ Massiv skalierbar</li>
+          <li>✓ Parametrisierbar (via Widgets)</li>
+          <li>✗ Braucht Code-Kenntnisse</li>
+          <li>✗ Kaltstart-Latenz (Cluster-Start)</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-amber">dispDB: Databricks Medallion</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Parameter &amp; Dynamische Ausdrücke in Pipelines</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Pipeline-Parameter</h3>
+        <ul>
+          <li>Werte die beim Pipeline-Start übergeben werden</li>
+          <li>Machen Pipelines wiederverwendbar statt starr</li>
+          <li>Typische Parameter für dispDB:</li>
+          <li><code>tableName</code>, <code>loadDate</code>, <code>mode</code></li>
+          <li>Können vom Trigger oder manuell übergeben werden</li>
+          <li>Basis für Metadaten-gesteuerte Pipelines</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Dynamische Ausdrücke (Expression Language)</h3>
+        <div class="code-block">
+@pipeline().parameters.tableName<br>
+@formatDateTime(pipeline().parameters.loadDate,<br>
+&nbsp;&nbsp;'yyyy/MM/dd')<br>
+@concat('bronze/', pipeline().parameters.tableName, '/')<br>
+@if(equals(pipeline().parameters.mode,<br>
+&nbsp;&nbsp;'full'), 'OVERWRITE', 'APPEND')
+        </div>
+        <div style="margin-top:4px"><span class="tag tag-blue">Prüfungsrelevant: Syntax kennen</span></div>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Metadaten-Pipeline:</strong> ForEach über Tabellenliste → Copy Activity mit <code>@item().tableName</code> und <code>@item().deltaMode</code> als dynamische Ausdrücke. Neue Tabelle = ein Eintrag in der Metadaten-Tabelle, keine Pipeline-Änderung nötig.</div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 1</span><span>Seite 1 — Workspace, Orchestrierung, Parameter</span></div>
+</div>
+
+<!-- SEITE 2: Git-Integration & Deployment Pipelines -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 1</h1><div class="subtitle">Git-Integration · Deployment Pipelines · Dev→Test→Prod · Begriffe</div></div>
+    <div class="badge">Seite 2 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Git-Integration — Versionskontrolle für Fabric-Artefakte</div>
+    <div class="highlight"><strong>Was in Git gespeichert wird:</strong> Artefakt-Definitionen (Notebooks als .ipynb, Pipelines als JSON, Lakehouses als YAML). <strong>Was NICHT in Git ist:</strong> Daten. Nur Logik und Konfiguration werden versioniert.</div>
+    <div class="grid-2">
+      <div class="card card-green">
+        <h3>Unterstützte Git-Anbieter</h3>
+        <ul>
+          <li><strong>Azure DevOps</strong> (empfohlen für Unternehmensumgebungen)</li>
+          <li><strong>GitHub</strong> (auch Enterprise)</li>
+          <li>Jeder Workspace → genau ein Branch</li>
+          <li>Änderungen im Workspace = uncommitted Changes (wie git status)</li>
+          <li>Commit aus Fabric heraus möglich</li>
+          <li>Pull = Änderungen aus Git in Workspace holen</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>Workspace ↔ Branch Mapping (typisches Muster)</h3>
+        <div class="code-block">
+dev-workspace   → feature/stefan-branch<br>
+test-workspace  → main<br>
+prod-workspace  → release
+        </div>
+        <ul style="margin-top:6px">
+          <li>Entwicklung auf Feature-Branch</li>
+          <li>Pull Request → Review → Merge nach main</li>
+          <li>Test-Workspace synct automatisch auf main</li>
+          <li>Release-Branch für Prod-Deployments</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp Sync-Konflikte:</strong> Wenn jemand direkt im Workspace ändert UND gleichzeitig im Git-Branch — entsteht ein Konflikt. Fabric zeigt das an. Entscheidung: Workspace-Version oder Git-Version gewinnt. Das ist eine typische Prüfungsfrage zu Git-Integration.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Deployment Pipelines — Dev → Test → Prod</div>
+    <div class="grid-2">
+      <div class="card card-blue">
+        <h3>Was Deployment Pipelines tun</h3>
+        <ul>
+          <li>Artefakte kontrolliert von einer Umgebung in die nächste promoten</li>
+          <li>Kein manuelles Kopieren von Artefakten</li>
+          <li>Was promoted wird: Pipelines, Lakehouses (Struktur), Notebooks, Reports, Semantic Models</li>
+          <li><strong>Was NICHT promoted wird:</strong> Daten — jede Umgebung hat eigene Daten</li>
+          <li>Vergleichsansicht: zeigt Unterschiede zwischen Umgebungen</li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>Deployment Rules — Parameterisierung</h3>
+        <ul>
+          <li>Pro Artefakt Regeln definieren die beim Deployment Werte anpassen</li>
+          <li>Die Pipeline-Logik ist dieselbe — Verbindungsziele ändern sich</li>
+        </ul>
+        <div class="code-block">
+Dev:  → dev-storage.dfs.core.windows.net<br>
+Test: → test-storage.dfs.core.windows.net<br>
+Prod: → prod-storage.dfs.core.windows.net
+        </div>
+        <div style="margin-top:4px"><span class="tag tag-blue">Prüfungsrelevant: Deployment Rules kennen</span></div>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Phase I:</strong> Git-Integration mit Azure DevOps (Mutterkonzern-Standard). Dev-Workspace für Entwicklung, Test für Abnahme, Prod für den Vorstandsreport. Deployment Rules stellen sicher dass Prod-Pipelines auf Prod-ADLS und Prod-Oracle zeigen.</div>
+    <div class="exam-note" style="margin-top:8px"><strong>Git vs. Deployment Pipelines — der Unterschied:</strong> Git kontrolliert den Code-Fluss (wer ändert was, Branches, Reviews) = Entwicklungs-Governance. Deployment Pipelines kontrollieren den Artefakt-Fluss zwischen Umgebungen = Release-Governance. Beide ergänzen sich.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tag 1 — Begriffe auf einen Blick</div>
+    <table>
+      <tr><th style="width:28%">Begriff</th><th>Ein-Satz-Definition</th></tr>
+      <tr><td><strong>Pipeline</strong></td><td>Orchestrierungscontainer — koordiniert Aktivitäten, bewegt Daten, ruft Notebooks auf. Kein Spark.</td></tr>
+      <tr><td><strong>Dataflow Gen2</strong></td><td>Low-code Transformation via Power Query — für Analysten, 300+ Konnektoren, direkt in Lakehouse.</td></tr>
+      <tr><td><strong>Notebook</strong></td><td>PySpark-basierte code-intensive Transformation — skalierbar, Delta MERGE, ML-fähig.</td></tr>
+      <tr><td><strong>High Concurrency Mode</strong></td><td>Mehrere Nutzer teilen einen Spark-Cluster — effizienter für interaktive Analysen.</td></tr>
+      <tr><td><strong>OneLake Data Access Roles</strong></td><td>Granulare Ordner-Zugriffskontrolle in OneLake — unterhalb der Workspace-Rollen-Ebene.</td></tr>
+      <tr><td><strong>Git-Integration</strong></td><td>Versionskontrolle für Fabric-Artefakte via Azure DevOps oder GitHub — Logik, keine Daten.</td></tr>
+      <tr><td><strong>Deployment Pipeline</strong></td><td>Fabric-eigenes CI/CD — promoted Artefakte von Dev → Test → Prod ohne manuelles Kopieren.</td></tr>
+      <tr><td><strong>Deployment Rules</strong></td><td>Automatische Wertanpassung beim Deployment (z.B. Connection Strings pro Umgebung).</td></tr>
+      <tr><td><strong>Pipeline-Parameter</strong></td><td>Werte die beim Pipeline-Start übergeben werden — machen Pipelines wiederverwendbar.</td></tr>
+      <tr><td><strong>Expression Language</strong></td><td>Dynamische Ausdrücke in Pipelines: <code>@pipeline().parameters.tableName</code></td></tr>
+      <tr><td><strong>Domain (Fabric)</strong></td><td>Optionale thematische Gruppierung mehrerer Workspaces mit gemeinsamen Governance-Richtlinien.</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">DP-700 Prüfungs-Quickref — Tag 1</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Typische Prüfungsfragen Tag 1</h3>
+        <ul>
+          <li>"Welches Werkzeug für low-code Transformation ohne Spark?" → Dataflow Gen2</li>
+          <li>"Wann High Concurrency Mode?" → viele gleichzeitige interaktive Nutzer</li>
+          <li>"Was wird in Git gespeichert?" → Artefakt-Definitionen, NICHT Daten</li>
+          <li>"Deployment Rules wofür?" → unterschiedliche Connection Strings pro Umgebung</li>
+          <li>"Pipeline vs. Notebook?" → Pipeline orchestriert, Notebook transformiert</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Wichtige Unterschiede zum Merken</h3>
+        <ul>
+          <li><strong>Git</strong> = Entwicklungs-Governance (Code-Fluss, Branches)</li>
+          <li><strong>Deployment Pipeline</strong> = Release-Governance (Artefakt-Fluss zwischen Umgebungen)</li>
+          <li><strong>Dataflow Gen2</strong> = transformiert Daten (M/Power Query)</li>
+          <li><strong>Pipeline</strong> = orchestriert Aktivitäten (kein Spark)</li>
+          <li><strong>Notebook</strong> = PySpark-Code (maximale Flexibilität)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 1</span><span>Seite 2 — Git-Integration, Deployment Pipelines, Begriffe, Prüfungs-Quickref</span></div>
+</div>
+
+</body>
+</html>
