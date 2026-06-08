@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DP-700 Crashkurs — Tag 5</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0f6e56; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #0f6e56; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #0f6e56; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #0f6e56; border-left: 4px solid #0f6e56; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #0a6e51; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .exam-note { background: #e8f2fb; border: 1px solid #90c0ea; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #0d4a8a; margin-top: 8px; }
+  .exam-note strong { color: #185fa5; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #0f6e56; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.7; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-blue{background:#d4e8f8;color:#185fa5;} .tag-coral{background:#fbe0d4;color:#8a3318;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Monitor Hub, Capacity Metrics, DMVs -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 5</h1><div class="subtitle">Monitor Hub · Capacity Metrics · DMVs · Spark UI</div></div>
+    <div class="badge">Seite 1 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Monitor Hub — zentrale Übersicht in Fabric</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Was der Monitor Hub zeigt</h3>
+        <ul>
+          <li>Alle Pipeline-Runs: Status, Dauer, Start/Ende</li>
+          <li>Alle Notebook-Ausführungen</li>
+          <li>Alle Dataflow Gen2-Runs</li>
+          <li>Direktlink zu Fehlerdetails pro Activity</li>
+          <li>Filter: Zeitraum / Status / Artefakt-Typ / Workspace</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>dispDB Tagesroutine</h3>
+        <ul>
+          <li>Morgens: Monitor Hub checken (2 Minuten)</li>
+          <li>Lief der nächtliche Delta Load durch?</li>
+          <li>Hat die Spätabend-Pipeline Fehler geworfen?</li>
+          <li>Fehler → direkt zu Fehlerdetails → Ursache</li>
+          <li>Grün = alles OK, Rot = Aktion nötig</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Capacity Metrics App — Verbrauch verstehen</div>
+    <div class="highlight"><strong>Was sie ist:</strong> Eine separate Power BI App die automatisch für jeden Fabric-Tenant bereitsteht. Zeigt CU-Verbrauch (Capacity Units) aller Workloads über Zeit — aufgeschlüsselt nach Workspace und Artefakt-Typ.</div>
+    <div class="grid-3">
+      <div class="card card-blue">
+        <h3>Smoothing</h3>
+        <ul>
+          <li>Fabric verteilt Verbrauchsspitzen über 24h</li>
+          <li>Kurze Last-Spitzen → nicht sofort gedrosselt</li>
+          <li>Schützt vor Throttling bei gelegentlichen Spitzen</li>
+          <li><strong>dispDB:</strong> gelegentliche Last-Spitzen sind unproblematisch</li>
+        </ul>
+      </div>
+      <div class="card card-coral">
+        <h3>Throttling</h3>
+        <ul>
+          <li>CU-Verbrauch dauerhaft über Capacity-Limit</li>
+          <li>Pipelines laufen langsamer</li>
+          <li>Abfragen dauern länger</li>
+          <li>Signal: mehr Capacity nötig</li>
+          <li>In App: rote Markierungen sichtbar</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Autoscale</h3>
+        <ul>
+          <li>Bestimmte F-SKUs: automatisch hochskalieren</li>
+          <li>Bei Bedarf — gegen Aufpreis</li>
+          <li>dispDB: vorerst feste Capacity (Mutterkonzern)</li>
+          <li>Prüfungsrelevant: Konzept kennen</li>
+        </ul>
+      </div>
+    </div>
+    <div class="exam-note"><strong>Prüfungstipp:</strong> Smoothing ≠ Throttling. Smoothing ist der Mechanismus der Spitzen verteilt. Throttling ist das Ergebnis wenn die Capacity trotzdem dauerhaft überschritten wird. F-SKUs vs. P-SKUs: für neue Deployments immer F-SKUs.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Spark UI — Performance in Notebooks diagnostizieren</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Die drei wichtigsten Spark UI Tabs</h3>
+        <ul>
+          <li><strong>Jobs:</strong> Ein Job = eine Action. Dauer und Fehler pro Job.</li>
+          <li><strong>Stages:</strong> Ein Job = mehrere Stages. Stage = parallele Tasks. Langsame Stage = Bottleneck.</li>
+          <li><strong>Tasks:</strong> Eine Stage = Tasks (einer pro Partition). Ungleiche Task-Dauern = Data Skew.</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Häufigste Performance-Probleme</h3>
+        <ul>
+          <li><strong>Data Skew:</strong> Spalte mit wenigen dominanten Werten → manche Tasks überlastet. Lösung: Salt-Technik oder andere Partitionierung.</li>
+          <li><strong>Shuffle:</strong> Daten zwischen Knoten verschieben (bei groupBy, join) → teuerste Operation. Im Spark UI: "Shuffle Read/Write" pro Stage.</li>
+          <li><strong>Small Files:</strong> Viele kleine Dateien → langsamer als wenige große. Lösung: OPTIMIZE.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">DMVs im Fabric Warehouse — Query Insights</div>
+    <div class="grid-2">
+      <div>
+        <div class="code-block">
+-- Aktive Abfragen im Warehouse<br>
+SELECT * FROM sys.dm_exec_requests<br>
+ORDER BY total_elapsed_time DESC;<br>
+<br>
+-- Verbindungsstatistiken<br>
+SELECT * FROM sys.dm_exec_sessions<br>
+WHERE is_user_process = 1;
+        </div>
+      </div>
+      <div class="card card-blue">
+        <h3>Query Insights &amp; DMVs</h3>
+        <ul>
+          <li><strong>Query Insights:</strong> eingebaut im Warehouse-Editor</li>
+          <li>Zeigt: längste Abfragen, Häufigkeit, Bottlenecks</li>
+          <li><strong>sys.dm_exec_requests:</strong> aktive Abfragen + Laufzeit</li>
+          <li><strong>sys.dm_exec_sessions:</strong> aktive User-Sessions</li>
+          <li><span class="tag tag-blue">Prüfungsrelevant: DMV-Namen kennen!</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 5</span><span>Seite 1 — Monitor Hub, Capacity Metrics, Spark UI, DMVs</span></div>
+</div>
+
+<!-- SEITE 2: Performance-Optimierung, Capacity Management, Begriffe -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>DP-700 Crashkurs — Tag 5</h1><div class="subtitle">Performance-Optimierung · Capacity Management · Begriffe · Prüfungs-Quickref</div></div>
+    <div class="badge">Seite 2 / 2</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Performance-Optimierung — die 5 wichtigsten Hebel</div>
+    <div class="grid-3">
+      <div class="card card-green">
+        <h3>1 — Partitionierung beim Schreiben</h3>
+        <ul>
+          <li>Physische Partitionierung nach Filter-Spalten</li>
+          <li>Power BI und Spark lesen nur relevante Partitionen</li>
+          <li>Kein Full Table Scan mehr</li>
+        </ul>
+        <div class="code-block">
+df.write.format("delta")<br>
+&nbsp;&nbsp;.partitionBy("jahr","monat")<br>
+&nbsp;&nbsp;.save("abfss://gold/...")
+        </div>
+      </div>
+      <div class="card card-green">
+        <h3>2 — OPTIMIZE + Z-ORDER</h3>
+        <ul>
+          <li>Kleine Dateien kompaktieren</li>
+          <li>Physisches Clustering nach Filter-Spalten</li>
+          <li>Wichtigster Hebel für Gold Layer</li>
+          <li>Wöchentlich ausführen</li>
+        </ul>
+        <div class="code-block">
+dt.optimize()<br>
+&nbsp;&nbsp;.executeZOrderBy(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;"datum", "region")
+        </div>
+      </div>
+      <div class="card card-green">
+        <h3>3 — Caching</h3>
+        <ul>
+          <li>DataFrame im Arbeitsspeicher halten</li>
+          <li>Bei mehrfacher Verwendung sinnvoll</li>
+          <li>Nach Verwendung freigeben!</li>
+        </ul>
+        <div class="code-block">
+df.cache()    # einmal lesen<br>
+# ... mehrfach verwenden ...<br>
+df.unpersist() # freigeben
+        </div>
+      </div>
+      <div class="card card-green">
+        <h3>4 — Broadcast Join</h3>
+        <ul>
+          <li>Kleine Lookup-Tabelle an alle Knoten senden</li>
+          <li>Kein teurer Shuffle-Join nötig</li>
+          <li>Für Dimensionstabellen ideal</li>
+        </ul>
+        <div class="code-block">
+from pyspark.sql.functions import broadcast<br>
+result = df_gross.join(<br>
+&nbsp;&nbsp;broadcast(df_klein), "key")
+        </div>
+      </div>
+      <div class="card card-green">
+        <h3>5 — V-Order</h3>
+        <ul>
+          <li>Microsofts proprietäre Parquet-Erweiterung</li>
+          <li>Zusätzliche Sortierung + Komprimierung beim Schreiben</li>
+          <li>DirectLake-Reads erheblich schneller</li>
+          <li>In Fabric Notebooks standardmäßig aktiv</li>
+        </ul>
+        <div class="code-block">
+spark.conf.set(<br>
+&nbsp;&nbsp;"spark.sql.parquet.vorder.enabled",<br>
+&nbsp;&nbsp;"true")
+        </div>
+      </div>
+      <div class="card card-amber">
+        <h3>Wann welchen Hebel?</h3>
+        <ul>
+          <li><strong>Langsame Pipeline:</strong> Partitionierung + Dynamic Range</li>
+          <li><strong>Langsame Power BI-Abfragen:</strong> OPTIMIZE + Z-ORDER + V-Order</li>
+          <li><strong>Langsames Notebook:</strong> Spark UI → Shuffle? Skew? → Cache / Broadcast</li>
+          <li><strong>Throttling:</strong> Capacity Metrics → CU-Verbrauch analysieren</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Performance-Strategie:</strong> Gold Layer wöchentlich OPTIMIZE + Z-ORDER nach <code>buchung_datum</code> und <code>region</code>. V-Order standardmäßig aktiv lassen. Broadcast Joins für Stammdaten-Lookups. Monitor Hub täglich checken.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Capacity Management — F-SKUs, Hierarchie, Burst</div>
+    <div class="grid-2">
+      <div class="card card-blue">
+        <h3>F-SKUs vs. P-SKUs</h3>
+        <ul>
+          <li><strong>F-SKUs</strong> (F2, F4, F8, F16, F32, F64…): Fabric-nativ, per Stunde bezahlt</li>
+          <li><strong>P-SKUs</strong> (P1, P2, P3): Power BI Premium, Monatslizenz, Legacy</li>
+          <li>Neue Deployments: immer F-SKUs!</li>
+          <li>P-SKUs: nur Kompatibilität für bestehende PBI Premium-Kunden</li>
+          <li><span class="tag tag-blue">Prüfungstipp: F-SKUs = neu, P-SKUs = Legacy</span></li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>Capacity-Hierarchie &amp; Burst</h3>
+        <ul>
+          <li>Eine Capacity → mehrere Workspaces möglich</li>
+          <li>Alle Workspaces teilen CUs der Capacity</li>
+          <li>Ein Workspace → nur einer Capacity zuweisbar</li>
+          <li><strong>Burst:</strong> kurzzeitig bis 10× mehr als zugewiesen erlaubt</li>
+          <li>Smoothing gleicht Burst über 24h aus</li>
+          <li>Autoscale: automatisch hochskalieren (Aufpreis)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tag 5 — Begriffe &amp; Prüfungs-Quickref</div>
+    <div class="grid-2">
+      <table>
+        <tr><th>Begriff</th><th>Definition</th></tr>
+        <tr><td><strong>Monitor Hub</strong></td><td>Fabric-eingebautes Monitoring: alle Pipeline/Notebook/Dataflow-Runs</td></tr>
+        <tr><td><strong>Capacity Metrics App</strong></td><td>Power BI App: CU-Verbrauch aller Workloads über Zeit</td></tr>
+        <tr><td><strong>Smoothing</strong></td><td>Fabric verteilt CU-Verbrauchsspitzen über 24h — schützt vor sofortigem Throttling</td></tr>
+        <tr><td><strong>Throttling</strong></td><td>Drosselung wenn CU-Verbrauch dauerhaft über Capacity-Limit</td></tr>
+        <tr><td><strong>Autoscale</strong></td><td>Automatisches Hochskalieren bei Bedarf (Aufpreis, bestimmte F-SKUs)</td></tr>
+        <tr><td><strong>F-SKU</strong></td><td>Fabric-native Capacity-SKU (F2–F2048), per Stunde bezahlt</td></tr>
+        <tr><td><strong>P-SKU</strong></td><td>Power BI Premium SKU (P1–P3), Monatslizenz, Legacy</td></tr>
+        <tr><td><strong>Burst</strong></td><td>Kurzzeitig bis 10× mehr CUs als zugewiesen — durch Smoothing ausgeglichen</td></tr>
+        <tr><td><strong>Spark UI</strong></td><td>Performance-Diagnosewerkzeug: Jobs, Stages, Tasks, Shuffle, Skew</td></tr>
+        <tr><td><strong>Data Skew</strong></td><td>Ungleichmäßige Datenverteilung → manche Tasks überlastet</td></tr>
+        <tr><td><strong>Shuffle</strong></td><td>Daten zwischen Knoten verschieben (bei groupBy/join) — teuerste Spark-Operation</td></tr>
+        <tr><td><strong>V-Order</strong></td><td>Microsofts Parquet-Erweiterung für schnellere DirectLake-Reads</td></tr>
+        <tr><td><strong>Broadcast Join</strong></td><td>Kleine Tabelle an alle Knoten senden — vermeidet teuren Shuffle-Join</td></tr>
+        <tr><td><strong>DMV</strong></td><td>Dynamic Management View: T-SQL-View für Laufzeitinformationen im Warehouse</td></tr>
+      </table>
+      <div class="card card-amber">
+        <h3>Typische Prüfungsfragen Tag 5</h3>
+        <ul>
+          <li>"Smoothing vs. Throttling?" → Smoothing verteilt Spitzen, Throttling ist die Drosselung bei dauerhafter Überschreitung</li>
+          <li>"F-SKU vs. P-SKU?" → F-SKU für neue Deployments, P-SKU Legacy</li>
+          <li>"Spark UI: langsame Stage?" → Bottleneck identifizieren → Data Skew oder Shuffle</li>
+          <li>"Was ist Data Skew?" → Ungleichmäßige Datenverteilung → manche Tasks dauern viel länger</li>
+          <li>"Shuffle vermeiden?" → Broadcast Join für kleine Tabellen</li>
+          <li>"DMV für aktive Abfragen?" → sys.dm_exec_requests</li>
+          <li>"V-Order wofür?" → Schnellere DirectLake-Reads durch proprietäre Parquet-Optimierung</li>
+          <li>"Wöchentliche Optimierung Gold Layer?" → OPTIMIZE + Z-ORDER</li>
+          <li>"Cache wann?" → Wenn dasselbe DataFrame mehrfach verwendet wird</li>
+          <li>"Burst-Faktor Capacity?" → bis 10× kurzzeitig erlaubt</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>DP-700 Crashkurs · Stefan · Tag 5</span><span>Seite 2 — Performance-Optimierung, Capacity Management, Begriffe, Quickref</span></div>
+</div>
+
+</body>
+</html>
