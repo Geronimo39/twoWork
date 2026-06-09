@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS Fabric – Cheat-Sheet Woche 3</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #5c3eb5; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #5c3eb5; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #5c3eb5; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #5c3eb5; border-left: 4px solid #5c3eb5; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #7a4a08; }
+  .essential { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #3c3489; margin-bottom: 8px; font-style: italic; }
+  .essential strong { color: #4a2fa0; font-style: normal; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #5c3eb5; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .flow-item { background: #5c3eb5; color: white; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .flow-item.gray{background:#888;} .flow-item.teal{background:#0f6e56;} .flow-item.amber{background:#854f0b;} .flow-item.green{background:#3b6d11;} .flow-item.blue{background:#185fa5;}
+  .flow-arrow { color: #999; font-size: 16px; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-coral{background:#fbe0d4;color:#8a3318;} .tag-purple{background:#e8e3fc;color:#4a2fa0;} .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;} .tag-gray{background:#ebebeb;color:#444;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .medallion-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .bronze { background: #f5f5f5; border: 1px solid #d0d0d0; border-radius: 8px 0 0 8px; padding: 10px 12px; }
+  .silver { background: #e8f7f2; border: 1px solid #7dd4b8; border-top: 1px solid #7dd4b8; border-bottom: 1px solid #7dd4b8; border-left: none; border-right: none; padding: 10px 12px; }
+  .gold   { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 0 8px 8px 0; padding: 10px 12px; }
+  .bronze h3 { color: #444; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .silver h3 { color: #0a6e51; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .gold   h3 { color: #7a4a08; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .bronze li, .silver li, .gold li { font-size: 11px; line-height: 1.55; color: #444; }
+  .bronze ul, .silver ul, .gold ul { padding-left: 14px; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Delta Lake -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 3</h1><div class="subtitle">Delta Lake: ACID · Time Travel · Schema Evolution · Tabellenformate</div></div>
+    <div class="badge">Seite 1 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Delta Lake — das technische Herzstück</div>
+    <div class="essential"><strong>Essentieller Satz:</strong> „Parquet ist das Dateiformat. Delta Lake ist Parquet plus Transaction Log — und damit der Unterschied zwischen einem dummen Dateisystem und einer echten Datenbank."</div>
+    <div class="grid-2">
+      <div class="card card-gray">
+        <h3>Aufbau einer Delta-Tabelle</h3>
+        <ul>
+          <li><strong>Datendateien:</strong> normale Parquet-Dateien auf ADLS/OneLake</li>
+          <li>Spaltenorientiert, komprimiert, effizient</li>
+          <li><strong>_delta_log/:</strong> JSON-Dateien — ein Commit pro Schreibvorgang</li>
+          <li>Log protokolliert: was wurde hinzugefügt / entfernt / geändert</li>
+          <li>Log speichert Metadaten, nicht die Daten selbst</li>
+          <li>Kombination aus beidem = ACID + Time Travel + Schema</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Warum Delta Lake existiert</h3>
+        <ul>
+          <li>Reiner Data Lake = dummes Dateisystem (kein ACID)</li>
+          <li>Zwei parallele Schreibvorgänge → Datenchaos ohne Delta</li>
+          <li>Abgebrochener Schreibvorgang → inkonsistenter Zustand ohne Delta</li>
+          <li>Delta Lake löst das durch das Transaction Log</li>
+          <li>Databricks und Fabric nutzen Delta Lake nativ</li>
+          <li>Offenes Format — kein Vendor Lock-in</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">ACID — was jeder Buchstabe konkret bedeutet</div>
+    <table>
+      <tr><th style="width:5%">Buchstabe</th><th style="width:20%">Begriff</th><th style="width:35%">Was es bedeutet</th><th style="width:40%">dispDB-Relevanz</th></tr>
+      <tr><td><strong>A</strong></td><td>Atomicity</td><td>Schreibvorgang ist entweder vollständig oder gar nicht — kein Teilzustand sichtbar</td><td>Full Load bricht nach 300k von 500k Zeilen ab → automatischer Rollback, Bronze sauber leer</td></tr>
+      <tr><td><strong>C</strong></td><td>Consistency</td><td>Tabelle ist immer in gültigem Zustand — kein halbfertiger Schreibvorgang je sichtbar</td><td>Power BI liest immer konsistenten Gold Layer — nie einen halb geschriebenen Stand</td></tr>
+      <tr><td><strong>I</strong></td><td>Isolation</td><td>Parallele Lese- und Schreibvorgänge stören sich nicht gegenseitig</td><td>Data Factory schreibt Bronze, Databricks liest gleichzeitig — kein Konflikt</td></tr>
+      <tr><td><strong>D</strong></td><td>Durability</td><td>Einmal committed = dauerhaft gespeichert, auch bei Systemabsturz danach</td><td>Delta Load erfolgreich committed → Daten sicher, auch wenn VM danach abstürzt</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Time Travel — historische Zustände abrufbar</div>
+    <div class="grid-2">
+      <div class="card card-blue">
+        <h3>Wie Time Travel funktioniert</h3>
+        <ul>
+          <li>Transaction Log protokolliert jeden Commit mit Zeitstempel</li>
+          <li>Delta kann jeden historischen Zustand rekonstruieren</li>
+          <li>Zwei Wege: nach Zeitstempel oder nach Version (Commit-Nr.)</li>
+          <li><code>timestampAsOf: "2026-05-18 14:00:00"</code></li>
+          <li><code>versionAsOf: 2</code></li>
+          <li>Retention: Standard 30 Tage (per VACUUM gelöscht)</li>
+          <li><strong>DORA: Retention bewusst setzen!</strong></li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>dispDB — drei praktische Szenarien</h3>
+        <ul>
+          <li><strong>Fehlerhafter Delta Load:</strong> falscher Stand in Silver → auf Zustand vor Load zurückrollen</li>
+          <li><strong>Reproduzierbare Reports:</strong> Vorstand fragt nach Report von vor 3 Wochen → Gold Layer zum damaligen Zeitpunkt lesen</li>
+          <li><strong>DORA/BaFin-Prüfung:</strong> nachweisen welche Daten wann in welchem Zustand waren — ohne separate Audit-Infrastruktur</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Schema Evolution — wenn Quellsysteme sich ändern</div>
+    <div class="grid-3">
+      <div class="card card-coral">
+        <h3>Schema Enforcement (Standard)</h3>
+        <ul>
+          <li>Neue Daten müssen exakt dem bestehenden Schema entsprechen</li>
+          <li>Neue Spalte aus Quelle → Fehler!</li>
+          <li>Sicher, aber unflexibel</li>
+          <li><span class="tag tag-amber">Silver &amp; Gold Layer</span></li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Schema Evolution (opt-in)</h3>
+        <ul>
+          <li><code>mergeSchema = true</code></li>
+          <li>Neue Spalten werden automatisch ergänzt</li>
+          <li>Alte Zeilen bekommen null für neue Spalte</li>
+          <li>Flexibel für sich ändernde Quellen</li>
+          <li><span class="tag tag-green">Bronze Layer</span></li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Schema Overwrite</h3>
+        <ul>
+          <li>Kompletter Schema-Tausch</li>
+          <li>Nur für kontrollierte Migrationen</li>
+          <li>Mit Vorsicht verwenden</li>
+          <li><span class="tag tag-gray">Selten / Migration</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Tabellenformate im Vergleich</div>
+    <table>
+      <tr><th>Eigenschaft</th><th>CSV</th><th>Parquet</th><th>Delta Lake</th></tr>
+      <tr><td>Orientierung</td><td>Zeilenorientiert, Text</td><td>Spaltenorientiert, binär</td><td>Parquet + Transaction Log</td></tr>
+      <tr><td>Performance</td><td>Schlecht</td><td>Sehr gut</td><td>Sehr gut</td></tr>
+      <tr><td>ACID</td><td>Nein</td><td>Nein</td><td><strong>Ja</strong></td></tr>
+      <tr><td>Time Travel</td><td>Nein</td><td>Nein</td><td><strong>Ja</strong></td></tr>
+      <tr><td>Schema versioniert</td><td>Nein</td><td>Eingebettet</td><td><strong>Ja, versioniert</strong></td></tr>
+      <tr><td>Databricks-nativ</td><td>Umständlich</td><td>Gut</td><td><strong>Nativ</strong></td></tr>
+      <tr><td>dispDB-Einsatz</td><td>Nie</td><td>Zwischenstufe (selten)</td><td><strong>Bronze / Silver / Gold</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 3</span><span>Seite 1 — Delta Lake: ACID, Time Travel, Schema, Formate</span></div>
+</div>
+
+<!-- SEITE 2: Medallion-Architektur -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 3</h1><div class="subtitle">Medallion-Architektur: Bronze · Silver · Gold — Databricks-Perspektive</div></div>
+    <div class="badge">Seite 2 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Medallion — das Grundprinzip</div>
+    <div class="essential"><strong>Essentieller Satz:</strong> „Bronze speichert was kam. Silver speichert was stimmt. Gold speichert was gebraucht wird."</div>
+    <div class="highlight"><strong>Wichtig für dispDB:</strong> Die Medallion-Architektur wird vollständig von <strong>Databricks</strong> umgesetzt — auf ADLS. Fabric (Data Factory) liefert Rohdaten in Bronze. Power BI konsumiert Gold via Shortcut. Die drei Schichten dazwischen sind reine Databricks-Welt.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Die drei Schichten im Detail</div>
+    <div class="medallion-row">
+      <div class="bronze">
+        <h3>🥉 Bronze — Rohdaten</h3>
+        <ul>
+          <li><strong>Verantwortung:</strong> Treue Kopie der Quelle</li>
+          <li>Nichts wird verändert, nichts gefiltert</li>
+          <li>Schema Evolution aktiv (<code>mergeSchema=true</code>)</li>
+          <li>Separate Ordner pro Quelle und Tabelle:</li>
+          <li><code>bronze/as400/buchungen/</code></li>
+          <li><code>bronze/oracle_alt/positionen/</code></li>
+          <li>Quarantäne-Unterordner für Fehler:</li>
+          <li><code>bronze/quarantine/as400/buchungen/</code></li>
+          <li>Kein JOIN, keine Aggregation</li>
+          <li><strong>Sicherheitsnetz: immer rückkehrbar</strong></li>
+        </ul>
+      </div>
+      <div class="silver">
+        <h3>🥈 Silver — bereinigte Daten</h3>
+        <ul>
+          <li><strong>Verantwortung:</strong> Technisch korrekt &amp; harmonisiert</li>
+          <li>Datentypen normieren (Oracle-Datum ≠ AS/400-Datum)</li>
+          <li>Duplikate entfernen (Full + Delta Overlap)</li>
+          <li>Nulls behandeln (auffüllen / markieren / verwerfen)</li>
+          <li>Spaltennamen harmonisieren (AS/400: max. 10 Zeichen)</li>
+          <li>Fehlerhafte Sätze → <code>bronze/quarantine/</code></li>
+          <li>E-Mail-Benachrichtigung an Quellsystem-Team</li>
+          <li>Erste einfache Joins AS/400 ↔ Oracle möglich</li>
+          <li>Schema Enforcement aktiv</li>
+        </ul>
+      </div>
+      <div class="gold">
+        <h3>🥇 Gold — business-ready</h3>
+        <ul>
+          <li><strong>Verantwortung:</strong> Direkt konsumierbar für Reports</li>
+          <li>Aggregationen (Summen, KPIs, Kennzahlen)</li>
+          <li>Fachliche Modellierung (Schaden + Deckung + Prämie)</li>
+          <li>Denormalisiert — breit, Power BI-optimiert</li>
+          <li><strong>External Tables auf definierten ADLS-Pfad!</strong></li>
+          <li>Fabric Shortcut zeigt auf diesen Pfad</li>
+          <li>Power BI liest via DirectLake — kein Datenmove</li>
+          <li>Phase I PoC: nur 2–3 Gold-Tabellen nötig</li>
+          <li>Schema Enforcement aktiv</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note" style="margin-top:8px"><strong>Warum External Tables im Gold Layer kritisch sind:</strong> Nur wenn Databricks den Gold Layer als External Table auf einem definierten ADLS-Pfad anlegt, kann Fabric via Shortcut darauf zeigen — ohne Datenkopie. Managed Tables liegen intern und sind für Fabric nicht direkt adressierbar.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Aufgabenteilung Fabric vs. Databricks</div>
+    <table>
+      <tr><th style="width:40%">Aufgabe</th><th style="width:30%">Wer</th><th style="width:30%">Womit</th></tr>
+      <tr><td>Ingest AS/400 → Bronze</td><td><strong>Fabric Data Factory</strong></td><td>SHIR + Copy Activity</td></tr>
+      <tr><td>Ingest Oracle → Bronze</td><td><strong>Fabric Data Factory</strong></td><td>SHIR + Copy Activity</td></tr>
+      <tr><td>Bronze → Silver (Bereinigung)</td><td><strong>Databricks</strong></td><td>PySpark Notebooks / Jobs</td></tr>
+      <tr><td>Silver → Gold (Aggregation)</td><td><strong>Databricks</strong></td><td>PySpark Notebooks / Jobs</td></tr>
+      <tr><td>Orchestrierung Transformation</td><td><strong>Databricks</strong></td><td>Databricks Workflows</td></tr>
+      <tr><td>Gold → Power BI bereitstellen</td><td><strong>Fabric</strong></td><td>Shortcut + Semantic Model</td></tr>
+      <tr><td>Reporting &amp; Visualisierung</td><td><strong>Fabric Power BI</strong></td><td>DirectLake + Reports</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">dispDB Ordnerstruktur auf ADLS (Empfehlung)</div>
+    <div class="grid-2">
+      <div class="card card-gray">
+        <h3>Bronze-Struktur</h3>
+        <ul>
+          <li><code>bronze/as400/buchungen/</code></li>
+          <li><code>bronze/as400/positionen/</code></li>
+          <li><code>bronze/as400/stammdaten/</code></li>
+          <li><code>bronze/oracle_alt/konten/</code></li>
+          <li><code>bronze/oracle_upgrade/deckungen/</code></li>
+          <li><code>bronze/quarantine/as400/buchungen/</code></li>
+          <li><code>bronze/quarantine/oracle_alt/konten/</code></li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Silver &amp; Gold-Struktur</h3>
+        <ul>
+          <li><code>silver/buchungen/</code></li>
+          <li><code>silver/positionen/</code></li>
+          <li><code>silver/konten/</code></li>
+          <li><code>gold/vorstandsreport_kpi/</code> ← Shortcut hier!</li>
+          <li><code>gold/schadenübersicht/</code> ← Shortcut hier!</li>
+          <li><code>gold/praemienentwicklung/</code> ← Shortcut hier!</li>
+          <li>Gold immer als External Table anlegen!</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 3</span><span>Seite 2 — Medallion: Bronze / Silver / Gold</span></div>
+</div>
+
+<!-- SEITE 3: Notebooks, Spark, Integration, Essentielle Sätze -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 3</h1><div class="subtitle">Notebooks &amp; Spark konzeptuell · Databricks-Integration · Essentielle Sätze des Kurses</div></div>
+    <div class="badge">Seite 3 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Notebooks &amp; Spark — nur was für Fabric relevant ist</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Was ein Notebook ist</h3>
+        <ul>
+          <li>Interaktives Dokument: Code + Ergebnisse + Erklärungen</li>
+          <li>Databricks Notebooks: PySpark / Python / SQL</li>
+          <li>Lesen Delta-Tabellen aus ADLS, transformieren, schreiben zurück</li>
+          <li>Können als <strong>Jobs</strong> geplant und automatisiert werden</li>
+          <li>Databricks Workflows orchestrieren mehrere Notebooks</li>
+          <li>Fabric hat ebenfalls native Notebooks — für dispDB sekundär</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Spark — das Motoren-Konzept</h3>
+        <ul>
+          <li>Verteilte Rechenmaschine — verteilt Last auf viele Knoten</li>
+          <li>Kann Terabytes verarbeiten ohne Engpässe</li>
+          <li>Liest und schreibt Delta-Tabellen nativ</li>
+          <li>Fabric-Relevanz: Spark ist Databricks-intern</li>
+          <li>Grund warum Databricks + Fabric über Delta/ADLS reibungslos zusammenarbeiten</li>
+        </ul>
+      </div>
+    </div>
+    <div class="essential"><strong>Essentieller Satz:</strong> „Spark ist der Motor, Databricks ist das Auto, Delta Lake ist die Straße — und Fabric liefert den Treibstoff (Rohdaten) und zeigt das Ziel an (Power BI)."</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Databricks-Integration mit Fabric — zwei Wege</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Weg 1 — Shortcut (empfohlen für Phase I)</h3>
+        <ul>
+          <li>Databricks schreibt Gold als External Tables auf ADLS-Pfad</li>
+          <li>Fabric legt Shortcut auf diesen Pfad</li>
+          <li>Power BI liest via DirectLake — kein Datenmove, keine Kopie</li>
+          <li>Einfach einzurichten, sofort verfügbar</li>
+          <li>Für PoC Vorstandsreport vollständig ausreichend</li>
+          <li><span class="tag tag-green">Phase I — jetzt</span></li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Weg 2 — Unity Catalog Integration</h3>
+        <ul>
+          <li>Databricks Unity Catalog direkt mit Fabric verbunden</li>
+          <li>Fabric sieht Databricks-Tabellen wie native Fabric-Tabellen</li>
+          <li>Zentrales Metadaten-Management über beide Plattformen</li>
+          <li>Mächtiger, aber komplexer in der Einrichtung</li>
+          <li>Setzt Unity Catalog in Databricks voraus</li>
+          <li><span class="tag tag-amber">Phase II — später</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Phase I:</strong> Shortcut reicht vollständig für den Vorstandsreport-PoC. Databricks schreibt Gold-Tabellen auf definierten ADLS-Pfad (External Tables). Fabric Shortcut zeigt darauf. Power BI DirectLake liest — fertig.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Essentielle Sätze des Crashkurses — Sammlung</div>
+    <div class="essential"><strong>Satz 1 (Woche 1):</strong> „Ein Lakehouse ist ein Warehouse mit Superkräften — es kann alles was ein Warehouse kann (SQL), aber zusätzlich auch Spark, Python und rohe Dateizugriffe."</div>
+    <div class="essential"><strong>Satz 2 (Woche 3):</strong> „Parquet ist das Dateiformat. Delta Lake ist Parquet plus Transaction Log — und damit der Unterschied zwischen einem dummen Dateisystem und einer echten Datenbank."</div>
+    <div class="essential"><strong>Satz 3 (Woche 3):</strong> „Bronze speichert was kam. Silver speichert was stimmt. Gold speichert was gebraucht wird."</div>
+    <div class="essential"><strong>Satz 4 (Woche 3):</strong> „Spark ist der Motor, Databricks ist das Auto, Delta Lake ist die Straße — und Fabric liefert den Treibstoff (Rohdaten) und zeigt das Ziel an (Power BI)."</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Woche 3 — Begriffe auf einen Blick</div>
+    <table>
+      <tr><th style="width:28%">Begriff</th><th>Ein-Satz-Definition</th></tr>
+      <tr><td><strong>Delta Lake</strong></td><td>Offenes Tabellenformat: Parquet-Dateien + Transaction Log = ACID + Time Travel + Schema Evolution.</td></tr>
+      <tr><td><strong>Transaction Log (_delta_log/)</strong></td><td>JSON-Dateien die jeden Commit protokollieren — Basis für ACID und Time Travel.</td></tr>
+      <tr><td><strong>ACID</strong></td><td>Atomicity, Consistency, Isolation, Durability — Garantien für zuverlässige Schreibvorgänge.</td></tr>
+      <tr><td><strong>Time Travel</strong></td><td>Fähigkeit, jeden historischen Zustand einer Delta-Tabelle abzurufen — per Zeitstempel oder Version.</td></tr>
+      <tr><td><strong>Schema Evolution</strong></td><td>Delta akzeptiert neue Spalten aus Quellsystemen automatisch (<code>mergeSchema=true</code>) — wichtig für Bronze Layer.</td></tr>
+      <tr><td><strong>Schema Enforcement</strong></td><td>Delta lehnt Daten ab, die nicht dem definierten Schema entsprechen — wichtig für Silver &amp; Gold Layer.</td></tr>
+      <tr><td><strong>Medallion-Architektur</strong></td><td>Dreischichtiges Datenveredelungsprinzip: Bronze (roh) → Silver (bereinigt) → Gold (business-ready).</td></tr>
+      <tr><td><strong>External Table</strong></td><td>Tabelle zeigt auf definierten ADLS-Pfad — Löschen der Tabelle lässt Daten unangetastet. Nötig für Fabric-Shortcut.</td></tr>
+      <tr><td><strong>VACUUM</strong></td><td>Delta-Befehl der alte Dateien löscht, die nicht mehr im Transaction Log referenziert sind. Beeinflusst Time-Travel-Reichweite.</td></tr>
+      <tr><td><strong>Spark</strong></td><td>Verteilte Rechenmaschine — Motor von Databricks. Liest und schreibt Delta-Tabellen nativ.</td></tr>
+      <tr><td><strong>Databricks Workflow</strong></td><td>Orchestrierungswerkzeug in Databricks — plant und sequenziert Notebook-Jobs (Bronze→Silver→Gold).</td></tr>
+    </table>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 3</span><span>Seite 3 — Notebooks, Spark, Integration, Essentielle Sätze</span></div>
+</div>
+
+</body>
+</html>
