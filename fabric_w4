@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS Fabric – Cheat-Sheet Woche 4</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #5c3eb5; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #5c3eb5; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #5c3eb5; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #5c3eb5; border-left: 4px solid #5c3eb5; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #7a4a08; }
+  .essential { background: #f3f0fd; border: 1px solid #c5b8f5; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #3c3489; margin-bottom: 8px; font-style: italic; }
+  .essential strong { color: #4a2fa0; font-style: normal; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #5c3eb5; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+  .code-block { background: #f5f5f5; border: 1px solid #ddd; border-radius: 6px; padding: 8px 10px; font-family: monospace; font-size: 10px; color: #333; margin: 4px 0; line-height: 1.6; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-coral{background:#fbe0d4;color:#8a3318;} .tag-purple{background:#e8e3fc;color:#4a2fa0;}
+  .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .tag-teal{background:#d4f0e6;color:#0a6e51;} .tag-gray{background:#ebebeb;color:#444;}
+  .check { color: #2e5a0a; font-weight: 700; }
+  .cross { color: #8a3318; font-weight: 700; }
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .mode-import { background: #f5f5f5; border: 1px solid #d0d0d0; border-radius: 8px 0 0 8px; padding: 10px 12px; }
+  .mode-dq     { background: #e8f2fb; border-top: 1px solid #90c0ea; border-bottom: 1px solid #90c0ea; border-left: none; border-right: none; padding: 10px 12px; }
+  .mode-dl     { background: #e8f7f2; border: 1px solid #7dd4b8; border-radius: 0 8px 8px 0; padding: 10px 12px; }
+  .mode-import h3 { color: #444; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .mode-dq     h3 { color: #0d4a8a; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .mode-dl     h3 { color: #0a6e51; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .mode-import li, .mode-dq li, .mode-dl li { font-size: 11px; line-height: 1.55; color: #444; }
+  .mode-import ul, .mode-dq ul, .mode-dl ul { padding-left: 14px; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1: Verbindungsmodi & Semantic Model -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 4</h1><div class="subtitle">DirectLake · DirectQuery · Import · Semantic Model</div></div>
+    <div class="badge">Seite 1 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Die drei Verbindungsmodi im Vergleich</div>
+    <div class="essential"><strong>Essentieller Satz:</strong> „DirectLake ist die Synthese aus Import (schnell) und DirectQuery (aktuell) — ohne die Nachteile beider. Er liest Delta-Dateien direkt aus OneLake, ohne Datenmove und ohne Refresh-Zyklus. Nur in Fabric verfügbar."</div>
+    <div class="mode-grid">
+      <div class="mode-import">
+        <h3>Import Mode</h3>
+        <ul>
+          <li>Datenkopie in Power BI (In-Memory)</li>
+          <li><span class="check">✓</span> Sehr schnell</li>
+          <li><span class="check">✓</span> Offline nutzbar</li>
+          <li><span class="cross">✗</span> Daten veralten</li>
+          <li><span class="cross">✗</span> Limit ~1 GB unkomprimiert</li>
+          <li><span class="cross">✗</span> Refresh-Zeitplan nötig (max. stündlich)</li>
+          <li><span class="cross">✗</span> Datenmove nötig</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-gray">dispDB: nicht geeignet</span></div>
+      </div>
+      <div class="mode-dq">
+        <h3>DirectQuery</h3>
+        <ul>
+          <li>Jede Abfrage → SQL live zur Quelle</li>
+          <li>Keine lokale Datenkopie</li>
+          <li><span class="check">✓</span> Immer aktuelle Daten</li>
+          <li><span class="check">✓</span> Kein Datenlimit</li>
+          <li><span class="cross">✗</span> Langsam bei Komplexität</li>
+          <li><span class="cross">✗</span> DB-Last bei jedem Klick</li>
+          <li><span class="cross">✗</span> DAX eingeschränkt</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-amber">dispDB: nicht optimal</span></div>
+      </div>
+      <div class="mode-dl">
+        <h3>DirectLake ⭐ (nur Fabric)</h3>
+        <ul>
+          <li>Liest Delta-Dateien direkt aus OneLake/ADLS</li>
+          <li>Column Framing: nur nötige Spalten in Memory</li>
+          <li><span class="check">✓</span> Schnell wie Import</li>
+          <li><span class="check">✓</span> Aktuell wie DirectQuery</li>
+          <li><span class="check">✓</span> Kein Datenlimit</li>
+          <li><span class="check">✓</span> Kein Refresh-Zyklus</li>
+          <li><span class="check">✓</span> Kein Datenmove</li>
+        </ul>
+        <div style="margin-top:6px"><span class="tag tag-teal">dispDB: genau das!</span></div>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>DirectLake Fallback:</strong> Bei zu komplexen DAX-Abfragen fällt Power BI automatisch auf DirectQuery zurück — transparent, sichtbar im Performance Analyzer. Für den Vorstandsreport (einfache KPIs) kein Problem.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Semantic Model — die Abstraktionsschicht</div>
+    <div class="highlight"><strong>Was es ist:</strong> Das Semantic Model (früher "Dataset") ist die Schicht zwischen rohen Gold-Daten und dem Report. Es ist die <strong>einzige Wahrheit</strong> über die Daten für alle Reports — alle bauen auf einem Modell auf.</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Was ein Semantic Model definiert</h3>
+        <ul>
+          <li>Welche Tabellen und Spalten sichtbar sind</li>
+          <li>Beziehungen zwischen Tabellen (1:n, n:m)</li>
+          <li>Berechnete Kennzahlen (Measures in DAX)</li>
+          <li>Hierarchien (Jahr → Quartal → Monat → Tag)</li>
+          <li>Row-Level Security (wer sieht welche Zeilen)</li>
+          <li>Benutzerfreundliche Namen (<code>KND_NR</code> → <code>Kundennummer</code>)</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Warum es wichtig ist</h3>
+        <ul>
+          <li>Business-Nutzer bauen eigene Reports — ohne Datenstruktur zu kennen</li>
+          <li>Alle Reports teilen dasselbe Modell → konsistente Kennzahlen</li>
+          <li>Änderungen am Modell wirken sich auf alle Reports aus</li>
+          <li>Semantic Model = Vertrag zwischen Data Team und Business</li>
+          <li><strong>dispDB:</strong> Ein Modell auf dem Gold Layer, alle Vorstandsreports darauf</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Semantic Model — Aufbau für dispDB (Doing-Schritte)</div>
+    <div class="grid-4">
+      <div class="card card-green">
+        <h3>1 — Shortcut prüfen</h3>
+        <ul>
+          <li>Shortcut auf Gold-Layer-Pfad gesetzt?</li>
+          <li>Delta-Tabellen im Lakehouse sichtbar?</li>
+          <li>SQL Analytics Endpoint verfügbar?</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>2 — Modell erstellen</h3>
+        <ul>
+          <li>Fabric → Lakehouse → Semantic Model erstellen</li>
+          <li>Gold-Tabellen auswählen</li>
+          <li>DirectLake-Modus wird automatisch gesetzt</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>3 — Modell aufbauen</h3>
+        <ul>
+          <li>Beziehungen zwischen Tabellen definieren</li>
+          <li>Measures anlegen (DAX)</li>
+          <li>Spalten umbenennen</li>
+          <li>Hierarchien anlegen</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>4 — Report bauen</h3>
+        <ul>
+          <li>Auf Semantic Model → Neuer Report</li>
+          <li>Visuals aus Measures aufbauen</li>
+          <li>Filter und Slicer konfigurieren</li>
+          <li>Im Workspace publizieren</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 4</span><span>Seite 1 — Verbindungsmodi &amp; Semantic Model</span></div>
+</div>
+
+<!-- SEITE 2: DAX, Report vs Dashboard, RLS -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 4</h1><div class="subtitle">DAX · Report vs. Dashboard vs. App · Row-Level Security</div></div>
+    <div class="badge">Seite 2 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">DAX — Grundkonzepte (nur was du wissen musst)</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Measure (Kennzahl) — dynamisch</h3>
+        <ul>
+          <li>Wird zur Abfragezeit berechnet</li>
+          <li>Ergebnis ändert sich je nach aktivem Filter</li>
+          <li>Lebt im Semantic Model, nicht in einer Tabellenspalte</li>
+          <li>Für: Summen, Quoten, Durchschnitte, Vergleiche</li>
+        </ul>
+        <div class="code-block">
+Gesamtprämie = SUM(Verträge[Prämie])<br>
+Schadenquote = DIVIDE([Gesamtschaden], [Gesamtprämie])<br>
+Vorjahresvergleich = CALCULATE([Gesamtprämie],<br>
+&nbsp;&nbsp;SAMEPERIODLASTYEAR(Datum[Datum]))
+        </div>
+        <div style="margin-top:4px"><span class="tag tag-teal">Für Vorstandsreport: hauptsächlich Measures</span></div>
+      </div>
+      <div class="card card-amber">
+        <h3>Calculated Column — statisch</h3>
+        <ul>
+          <li>Wird beim Laden berechnet, als Spalte gespeichert</li>
+          <li>Ergebnis ist fix — ändert sich nicht durch Filter</li>
+          <li>Belegt Speicherplatz in der Tabelle</li>
+          <li>Für: Kategorisierungen, abgeleitete Attribute</li>
+        </ul>
+        <div class="code-block">
+Vertragsjahr = YEAR(Verträge[Abschlussdatum])<br>
+Schadensklasse =<br>
+&nbsp;&nbsp;IF(Schäden[Betrag] > 10000, "Groß", "Klein")<br>
+Altersgruppe = INT(Kunden[Alter] / 10) * 10
+        </div>
+        <div style="margin-top:4px"><span class="tag tag-gray">Für Gruppierung, Klassifizierung</span></div>
+      </div>
+    </div>
+    <div class="highlight" style="margin-top:8px"><strong>Faustregel:</strong> Was sich summiert, quotiert oder zählt → <strong>Measure</strong>. Was kategorisiert oder klassifiziert → <strong>Calculated Column</strong>. Im Zweifel: Measure — es ist flexibler und speichersparender.</div>
+    <div class="section">
+      <div class="section-title" style="margin-top:8px">Wichtige DAX-Funktionen für den Vorstandsreport</div>
+      <table>
+        <tr><th style="width:25%">Funktion</th><th style="width:35%">Was sie tut</th><th style="width:40%">Beispiel</th></tr>
+        <tr><td><code>SUM()</code></td><td>Summe einer Spalte</td><td><code>SUM(Verträge[Prämie])</code></td></tr>
+        <tr><td><code>DIVIDE()</code></td><td>Division mit sicherem Fallback (kein /0-Fehler)</td><td><code>DIVIDE([Schäden],[Prämien],0)</code></td></tr>
+        <tr><td><code>CALCULATE()</code></td><td>Kennzahl in geändertem Filterkontext berechnen</td><td><code>CALCULATE([KPI], Jahr=2025)</code></td></tr>
+        <tr><td><code>SAMEPERIODLASTYEAR()</code></td><td>Vorjahreszeitraum — für YoY-Vergleiche</td><td><code>CALCULATE([KPI], SAMEPERIODLASTYEAR(...))</code></td></tr>
+        <tr><td><code>COUNTROWS()</code></td><td>Anzahl Zeilen (mit Filterkontext)</td><td><code>COUNTROWS(Schäden)</code></td></tr>
+        <tr><td><code>IF()</code></td><td>Bedingte Logik</td><td><code>IF([Quote]>0.7,"⚠","✓")</code></td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Report vs. Dashboard vs. App</div>
+    <div class="grid-3">
+      <div class="card card-blue">
+        <h3>Report</h3>
+        <ul>
+          <li>Mehrseitige interaktive Analyse</li>
+          <li>Basiert auf einem Semantic Model</li>
+          <li>Nutzer können filtern, drilldown, Seiten wechseln</li>
+          <li>Hauptprodukt für den Vorstand</li>
+          <li>Wird im Workspace gespeichert</li>
+          <li><span class="tag tag-teal">dispDB Phase I: Kernlieferable</span></li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>Dashboard</h3>
+        <ul>
+          <li>Einzelne Seite mit Kacheln (Tiles)</li>
+          <li>Kacheln aus verschiedenen Reports</li>
+          <li>Schnelle Übersicht — weniger interaktiv</li>
+          <li>Für Vorstand als erster Bildschirm geeignet</li>
+          <li>Kein direktes Semantic Model — aggregiert Reports</li>
+          <li><span class="tag tag-amber">dispDB: ergänzend zu Report</span></li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>App</h3>
+        <ul>
+          <li>Gebündeltes Paket: Reports + Dashboards</li>
+          <li>Eigenes Navigationsmenü</li>
+          <li>Für strukturierte Rollouts an Nutzergruppen</li>
+          <li>Versionierbar und publishbar</li>
+          <li>Professionellste Auslieferungsform</li>
+          <li><span class="tag tag-gray">dispDB Phase II</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Row-Level Security (RLS)</div>
+    <div class="grid-2">
+      <div class="card card-coral">
+        <h3>Was RLS ist</h3>
+        <ul>
+          <li>Einschränkung welche Zeilen ein User sehen darf</li>
+          <li>Basiert auf der Identität des eingeloggten Users</li>
+          <li>Definiert als DAX-Filter-Regel pro Rolle im Semantic Model</li>
+          <li>Power BI wendet Filter automatisch an — User sieht nichts anderes</li>
+          <li>Gleicher Report, unterschiedliche Datensicht</li>
+        </ul>
+      </div>
+      <div class="card card-coral">
+        <h3>dispDB — wann RLS relevant wird</h3>
+        <ul>
+          <li><strong>Vorstandsreport Phase I:</strong> kein RLS nötig — Vorstand sieht alles</li>
+          <li><strong>Operative Reports Phase II:</strong> Regionalleiter sieht nur seine Region</li>
+          <li><strong>Abteilungsleiter:</strong> sieht nur seine Kostenstelle</li>
+          <li>RLS-Rollen im Semantic Model definieren, Entra ID-Gruppen zuweisen</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>RLS-Beispiel:</strong> Rolle "Regionalleiter_Nord" mit DAX-Filter <code>[Region] = "Nord"</code>. Entra ID-Gruppe "Regionalleiter_Nord" dieser Rolle zuweisen. Fertig — kein separates Report-Deployment nötig.</div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 4</span><span>Seite 2 — DAX, Report/Dashboard/App, RLS</span></div>
+</div>
+
+<!-- SEITE 3: Vorstandsreport-Design & Essentielle Sätze -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 4</h1><div class="subtitle">Executive Dashboard Design · PoC-Empfehlung · Essentielle Sätze</div></div>
+    <div class="badge">Seite 3 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Was einen guten Vorstandsreport ausmacht</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Design-Prinzipien</h3>
+        <ul>
+          <li><strong>Weniger ist mehr:</strong> 3–5 KPIs pro Seite, nicht 20 Kennzahlen</li>
+          <li><strong>Trend schlägt Absolutwert:</strong> Zahl + Vorjahresvergleich + Trendpfeil</li>
+          <li><strong>Ampel-Logik:</strong> Grün/Gelb/Rot für Zielerfüllung — sofort erkennbar</li>
+          <li><strong>Eine Geschichte pro Seite:</strong> Seite 1 = Schadensentwicklung, Seite 2 = Prämien — nicht beides</li>
+          <li><strong>Antwort sichtbar, nicht suchbar:</strong> Vorstand liest, nicht klickt</li>
+          <li><strong>Konsistente Farbsprache:</strong> Rot = schlecht, Grün = gut — immer</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Typische Vorstandskennzahlen (Versicherung)</h3>
+        <ul>
+          <li>Schadenquote (Schäden / Prämien) — mit Ampel</li>
+          <li>Prämienentwicklung YoY (% Veränderung zum Vorjahr)</li>
+          <li>Anzahl Neuverträge — mit Trend</li>
+          <li>Stornoqoute — mit Zielwert</li>
+          <li>Combined Ratio — Gesamtsteuerungskennzahl</li>
+          <li>Schadensreserve — absolut + Entwicklung</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">PoC Vorstandsreport — konkrete Empfehlung für dispDB Phase I</div>
+    <div class="highlight"><strong>Empfehlung:</strong> Maximal <strong>2 Seiten</strong> für den ersten PoC. Das ist lieferbar, überzeugt, und kann später ausgebaut werden.</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Seite 1 — KPI-Übersicht</h3>
+        <ul>
+          <li>4–5 KPI-Kacheln (Card Visuals) mit Ampelfarben</li>
+          <li>Jede Kachel: Istwert + Zielwert + Abweichung</li>
+          <li>Zeitraumfilter (Slicer: Jahr / Quartal)</li>
+          <li>Keine Tabellen, keine Detailansichten</li>
+          <li>Ziel: Vorstand sieht in 5 Sekunden ob alles OK ist</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Seite 2 — Trendanalyse</h3>
+        <ul>
+          <li>1–2 Liniendiagramme (Trend über Zeit)</li>
+          <li>Vorjahresvergleich als gestrichelte Linie</li>
+          <li>Drilldown von Jahr → Quartal → Monat</li>
+          <li>Optional: Tabelle mit Top-5 Schadenpositionen</li>
+          <li>Ziel: Entwicklung auf einen Blick</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>Technischer Pfad für den PoC:</strong> Databricks Gold Layer (External Table) → Fabric Shortcut → Semantic Model (DirectLake) → Report. Keine Zwischenstufen, kein Datenmove. Der kürzeste Weg vom Ingest zum Vorstandsreport.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Woche 4 — Begriffe auf einen Blick</div>
+    <table>
+      <tr><th style="width:28%">Begriff</th><th>Ein-Satz-Definition</th></tr>
+      <tr><td><strong>Import Mode</strong></td><td>Datenkopie in Power BI In-Memory — schnell, aber veraltet und limitiert. Für dispDB nicht geeignet.</td></tr>
+      <tr><td><strong>DirectQuery</strong></td><td>Jede Abfrage live zur Quelle — immer aktuell, aber langsam und DB-belastend.</td></tr>
+      <tr><td><strong>DirectLake</strong></td><td>Liest Delta-Dateien direkt aus OneLake — schnell UND aktuell, kein Datenmove. Nur in Fabric.</td></tr>
+      <tr><td><strong>Column Framing</strong></td><td>DirectLake lädt nur die für die Abfrage nötigen Spalten in Memory — effizient, kein Full-Table-Scan.</td></tr>
+      <tr><td><strong>Semantic Model</strong></td><td>Abstraktionsschicht zwischen Daten und Report — definiert Kennzahlen, Beziehungen, Sicherheit, Namen.</td></tr>
+      <tr><td><strong>Measure</strong></td><td>DAX-Berechnung zur Abfragezeit — dynamisch, filterabhängig. Für KPIs, Summen, Quoten.</td></tr>
+      <tr><td><strong>Calculated Column</strong></td><td>DAX-Berechnung beim Laden — statisch, gespeichert. Für Kategorisierungen und Klassifizierungen.</td></tr>
+      <tr><td><strong>DAX</strong></td><td>Data Analysis Expressions — Formelsprache von Power BI für Measures und Calculated Columns.</td></tr>
+      <tr><td><strong>Report</strong></td><td>Mehrseitige interaktive Analyse auf Basis eines Semantic Models — Hauptlieferable für den Vorstand.</td></tr>
+      <tr><td><strong>Dashboard</strong></td><td>Einzelseite mit Kacheln aus verschiedenen Reports — schnelle Übersicht, weniger interaktiv.</td></tr>
+      <tr><td><strong>App</strong></td><td>Gebündeltes Paket aus Reports + Dashboards mit Navigationsmenü — für Phase II Rollout.</td></tr>
+      <tr><td><strong>Row-Level Security (RLS)</strong></td><td>Einschränkung welche Datenzeilen ein User sehen darf — über DAX-Filter-Regeln und Entra ID-Gruppen.</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Essentielle Sätze — aktueller Stand der Sammlung</div>
+    <div class="essential"><strong>Satz 1 (Woche 1):</strong> „Ein Lakehouse ist ein Warehouse mit Superkräften — es kann alles was ein Warehouse kann (SQL), aber zusätzlich auch Spark, Python und rohe Dateizugriffe."</div>
+    <div class="essential"><strong>Satz 2 (Woche 3):</strong> „Parquet ist das Dateiformat. Delta Lake ist Parquet plus Transaction Log — und damit der Unterschied zwischen einem dummen Dateisystem und einer echten Datenbank."</div>
+    <div class="essential"><strong>Satz 3 (Woche 3):</strong> „Bronze speichert was kam. Silver speichert was stimmt. Gold speichert was gebraucht wird."</div>
+    <div class="essential"><strong>Satz 4 (Woche 3):</strong> „Spark ist der Motor, Databricks ist das Auto, Delta Lake ist die Straße — und Fabric liefert den Treibstoff (Rohdaten) und zeigt das Ziel an (Power BI)."</div>
+    <div class="essential"><strong>Satz 5 (Woche 3):</strong> „Delta Lake Time Travel ist wie Git für Datentabellen — jeder Schreibvorgang ist ein Commit, und du kannst jeden historischen Stand wiederherstellen. Aber ohne Branches, und mit automatischem Verfallsdatum."</div>
+    <div class="essential"><strong>Satz 6 (Woche 4):</strong> „DirectLake ist die Synthese aus Import (schnell) und DirectQuery (aktuell) — ohne die Nachteile beider. Er liest Delta-Dateien direkt aus OneLake, ohne Datenmove und ohne Refresh-Zyklus. Nur in Fabric verfügbar."</div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 4</span><span>Seite 3 — Vorstandsreport Design, Begriffe, Essentielle Sätze</span></div>
+</div>
+
+</body>
+</html>
