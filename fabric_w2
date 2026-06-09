@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS Fabric – Cheat-Sheet Woche 2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+  .page { width: 297mm; min-height: 210mm; background: white; margin: 12px auto; padding: 14mm 14mm 12mm 14mm; box-shadow: 0 2px 10px rgba(0,0,0,0.12); page-break-after: always; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #5c3eb5; padding-bottom: 8px; margin-bottom: 14px; }
+  .page-header h1 { font-size: 18px; color: #5c3eb5; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge { background: #5c3eb5; color: white; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .section { margin-bottom: 14px; }
+  .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #5c3eb5; border-left: 4px solid #5c3eb5; padding-left: 8px; margin-bottom: 8px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .card { border-radius: 8px; padding: 10px 12px; border: 1px solid #e0e0e0; }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+  .card code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; } .card-purple h3 { color: #4a2fa0; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; } .card-teal   h3 { color: #0a6e51; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; } .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; } .card-blue   h3 { color: #0d4a8a; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; } .card-amber  h3 { color: #7a4a08; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; } .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; } .card-green  h3 { color: #2e5a0a; }
+  .highlight { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 8px; padding: 8px 12px; font-size: 11px; color: #555; margin-bottom: 10px; }
+  .highlight strong { color: #7a4a08; }
+  .dispdb-note { background: #fdf0ec; border: 1px solid #f4b8a0; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #6b2a10; margin-top: 8px; }
+  .dispdb-note strong { color: #8a3318; }
+  .warn-note { background: #fdf5e6; border: 1px solid #f5cc7a; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a4a08; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { background: #5c3eb5; color: white; padding: 6px 10px; text-align: left; font-weight: 600; }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td code { font-size: 10px; background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
+  .flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .flow-item { background: #5c3eb5; color: white; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .flow-item.gray{background:#888;} .flow-item.teal{background:#0f6e56;} .flow-item.amber{background:#854f0b;} .flow-item.green{background:#3b6d11;}
+  .flow-arrow { color: #999; font-size: 16px; }
+  .tag { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px; margin: 1px 2px; font-weight: 600; }
+  .tag-coral{background:#fbe0d4;color:#8a3318;} .tag-purple{background:#e8e3fc;color:#4a2fa0;} .tag-amber{background:#faeeda;color:#7a4a08;} .tag-green{background:#d4edbb;color:#2e5a0a;}
+  .page-footer { border-top: 1px solid #ddd; margin-top: 12px; padding-top: 6px; display: flex; justify-content: space-between; font-size: 10px; color: #999; }
+  @media print { body{background:white;} .page{box-shadow:none;margin:0;page-break-after:always;} }
+</style>
+</head>
+<body>
+
+<!-- SEITE 1 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 2</h1><div class="subtitle">SHIR · Linked Services · Data Factory Grundkonzepte</div></div>
+    <div class="badge">Seite 1 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">SHIR — Self-hosted Integration Runtime</div>
+    <div class="highlight"><strong>Kernaussage:</strong> SHIR ist die Brücke zwischen privatem Firmennetz (AS/400, Oracle) und Azure Cloud (Fabric Data Factory). Er baut <strong>ausgehende</strong> HTTPS-Verbindungen auf — kein eingehender Traffic nötig. Schlüssel zur Firewall-Konfiguration.</div>
+    <div class="grid-2">
+      <div class="card card-amber">
+        <h3>Wie SHIR funktioniert (Ablauf)</h3>
+        <ul>
+          <li>Fabric sendet Auftrag an SHIR via HTTPS Port 443 (ausgehend)</li>
+          <li>SHIR baut <em>lokal</em> Verbindung zur Quelle auf (AS/400 / Oracle)</li>
+          <li>SHIR liest Daten, komprimiert und verschlüsselt sie</li>
+          <li>SHIR überträgt ausgehend an ADLS / OneLake</li>
+          <li>Azure öffnet <strong>niemals</strong> eingehende Verbindung ins Firmennetz</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>VM-Anforderungen</h3>
+        <ul>
+          <li>Windows Server 2016/2019/2022 oder Win 10/11 (64-bit)</li>
+          <li>RAM: mind. 8 GB (mehr bei großen Datenbewegungen)</li>
+          <li>.NET Framework 4.7.2 oder höher</li>
+          <li>Ausgehend Port 443 zu <code>*.servicebus.windows.net</code></li>
+          <li>Ausgehend Port 443 zu <code>*.frontend.clouddatahub.net</code></li>
+          <li><strong>Standort: On-Premise oder Azure-VM — noch zu klären!</strong></li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB Firewall-Aufgabe:</strong> Ausgehenden Traffic von der SHIR-VM auf Port 443 zu den genannten Azure-Domains freigeben. Kein eingehender Port muss geöffnet werden. SHIR-Standort beeinflusst konkrete Firewall-Konfiguration.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Linked Services — Verbindungsdefinitionen (Analogie: Python connect())</div>
+    <div class="highlight"><strong>Analogie:</strong> Linked Service ≈ <code>pyodbc.connect("DSN=...")</code> oder <code>oracledb.connect(user=..., dsn="host:port/SERVICE_NAME")</code> — aber sicher in Azure Key Vault verwaltet, wiederverwendbar, an SHIR gebunden.</div>
+    <table>
+      <tr><th style="width:4%">#</th><th style="width:20%">Linked Service</th><th style="width:16%">Connector</th><th style="width:18%">Runtime</th><th style="width:42%">Schlüsselparameter</th></tr>
+      <tr><td><strong>1</strong></td><td><strong>AS/400 (Power i)</strong></td><td>ODBC</td><td><span class="tag tag-amber">SHIR</span></td><td>DSN oder direkte ODBC-Parameter; IBM i Access ODBC Driver; Credentials in Key Vault</td></tr>
+      <tr><td><strong>2</strong></td><td><strong>Oracle 11g (alt)</strong></td><td>Oracle</td><td><span class="tag tag-amber">SHIR</span></td><td>Host, Port 1521, Service Name aus <code>SELECT instance_name FROM v$instance</code>; Thin Mode; Credentials in Key Vault</td></tr>
+      <tr><td><strong>3</strong></td><td><strong>Oracle (Upgrade)</strong></td><td>Oracle</td><td><span class="tag tag-amber">SHIR</span></td><td>Wie #2, anderer Service Name / Port; parallel betreiben (zwei separate Linked Services)</td></tr>
+      <tr><td><strong>4</strong></td><td><strong>ADLS / OneLake (Ziel)</strong></td><td>ADLS Gen2</td><td><span class="tag tag-green">Fabric-nativ</span></td><td>Storage Account URL; Managed Identity (DORA-konform, bevorzugt); kein SHIR, kein Treiber nötig</td></tr>
+    </table>
+    <div class="warn-note"><strong>Oracle Thin Mode:</strong> <code>pip install oracledb</code> — kostenlos, kein Oracle Client nötig, kein 32/64-Bit-Konflikt (64-Bit Python + 32-Bit Oracle 11g kein Problem im Thin Mode). Verbindungstest mit korrektem Service Name steht noch aus — offener Punkt!</div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 2</span><span>Seite 1 — SHIR &amp; Linked Services</span></div>
+</div>
+
+<!-- SEITE 2 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 2</h1><div class="subtitle">Pipelines · Copy Activity · Datasets · Trigger · Fehlerbehandlung</div></div>
+    <div class="badge">Seite 2 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Pipeline-Konzepte</div>
+    <div class="grid-3">
+      <div class="card card-purple">
+        <h3>Pipeline</h3>
+        <ul>
+          <li>Orchestrierungscontainer für Activities</li>
+          <li>Definiert Reihenfolge und Abhängigkeiten</li>
+          <li>Parametrisierbar (Datum, Tabellenname)</li>
+          <li>Wird durch Trigger oder manuell gestartet</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Wichtige Activity-Typen</h3>
+        <ul>
+          <li><strong>Copy Activity</strong> — Daten bewegen</li>
+          <li><strong>ForEach</strong> — Schleife über Tabellenliste</li>
+          <li><strong>Notebook Activity</strong> — Spark/Databricks aufrufen</li>
+          <li><strong>If Condition</strong> — Verzweigung</li>
+          <li><strong>Web Activity</strong> — HTTP-Aufruf / Benachrichtigung</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>Datasets</h3>
+        <ul>
+          <li>Beschreibt <em>was</em> kopiert wird</li>
+          <li>Verweist auf Linked Service</li>
+          <li>Quelle: Tabelle oder SQL-Query</li>
+          <li>Ziel: Ordnerpfad + Dateiformat (Parquet)</li>
+          <li>Parametrisierbar (Tabellenname, Zeitfenster)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Copy Activity — das Arbeitspferd</div>
+    <div class="flow">
+      <div class="flow-item gray">Quell-Dataset<br><small>AS/400 Tabelle</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item">Copy Activity<br><small>SHIR führt aus</small></div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item teal">Ziel-Dataset<br><small>ADLS Bronze Parquet</small></div>
+    </div>
+    <div class="grid-2" style="margin-top:8px">
+      <div class="card card-teal">
+        <h3>Wichtige Einstellungen</h3>
+        <ul>
+          <li><strong>Zielformat:</strong> Parquet (spaltenorientiert, Databricks-nativ, nicht CSV)</li>
+          <li><strong>Partition Options:</strong> Dynamic Range (nach ID oder Datum)</li>
+          <li><strong>Degree of Parallelism:</strong> Anzahl paralleler SHIR-Verbindungen zur DB</li>
+          <li><strong>Fault Tolerance:</strong> Bei Finanzdaten → Fehler stoppen, nicht überspringen</li>
+          <li>Retry: max. 2 Versuche, 5 Min. Wartezeit</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Chunking / Parallelität</h3>
+        <ul>
+          <li>Nicht Zeilenanzahl-basiert (wie Python), sondern Wertebereiche</li>
+          <li>Partition Column (ID oder Datum) + Anzahl Partitionen angeben</li>
+          <li>SHIR öffnet pro Partition eigene DB-Verbindung (parallel)</li>
+          <li>I/O-bound → Threads effizient, kein Python-GIL-Problem</li>
+          <li>Mehrere parallele DB-Verbindungen ≈ echte Parallelität auf DB-Ebene</li>
+          <li><em>Details Partitions-Strategie: separat vertiefen</em></li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note"><strong>dispDB:</strong> ForEach Activity iteriert über Metadaten-Tabelle → eine parametrisierte Copy Activity pro Tabelle. Zielformat immer Parquet im Bronze-Ordner. Fehler bei Finanzdaten → Pipeline stoppen, nicht ignorieren.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Trigger-Typen &amp; Fehlerbehandlung</div>
+    <div class="grid-2">
+      <div class="card card-blue">
+        <h3>Trigger-Typen</h3>
+        <table style="margin-top:4px">
+          <tr><th>Typ</th><th>dispDB-Einsatz</th></tr>
+          <tr><td><strong>Schedule</strong></td><td>Feste Uhrzeit — einfachste Option</td></tr>
+          <tr><td><strong>Tumbling Window</strong></td><td>Delta Loads — liefert WindowStart/End als Parameter</td></tr>
+          <tr><td><strong>Manual</strong></td><td>Full Load, Tests, Backfills</td></tr>
+          <tr><td><strong>Event</strong></td><td>Phase I nicht relevant</td></tr>
+        </table>
+      </div>
+      <div class="card card-coral">
+        <h3>Bronze-Quarantäne-Strategie (dispDB)</h3>
+        <ul>
+          <li>Bronze nimmt <em>alles</em> rein — roh, ungeprüft</li>
+          <li>Databricks validiert: Bronze → Silver (gut) oder Bronze/quarantine/ (fehlerhaft)</li>
+          <li>Power Automate / Logic App: E-Mail an Quellsystem-Verantwortliche</li>
+          <li>Team korrigiert manuell in Quell-DB</li>
+          <li>Nächster Delta Load → korrigierte Daten fließen normal ein</li>
+          <li>onFailure in Pipeline → Benachrichtigung + Eskalation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 2</span><span>Seite 2 — Pipelines, Copy Activity, Trigger, Fehlerbehandlung</span></div>
+</div>
+
+<!-- SEITE 3 -->
+<div class="page">
+  <div class="page-header">
+    <div><h1>MS Fabric — Cheat-Sheet Woche 2</h1><div class="subtitle">Ingest-Strategie · Delta-Identifikation · CDC-Vormerk · Doing-Schritte</div></div>
+    <div class="badge">Seite 3 / 3</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">dispDB Ingest-Strategie</div>
+    <div class="grid-2">
+      <div class="card card-blue">
+        <h3>Full Load (einmalig, Samstag)</h3>
+        <ul>
+          <li>Wartungsfenster — exklusiver DB-Zugriff (ohne Diskussion)</li>
+          <li>Lieber Freitagnacht starten — Puffer einplanen!</li>
+          <li>Trigger: Manual</li>
+          <li>Alle Tabellen komplett laden → vollständiger Bronze-Layer als Baseline</li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>Delta Loads (3× täglich)</h3>
+        <ul>
+          <li>Morgens ~06:00, Mittags ~12:00, Spätabends ~22:00</li>
+          <li>Spätabend: kleinstes Delta, minimale DB-Last — kluge Wahl!</li>
+          <li>Trigger: Tumbling Window (gibt Zeitfenster als Parameter mit)</li>
+          <li>Filter: <code>WHERE last_modified &gt; :WindowStart</code></li>
+        </ul>
+      </div>
+    </div>
+    <div class="warn-note"><strong>⚠ Kritischer Klärungspunkt (asap!):</strong> Pflegen AS/400 und Oracle eine zuverlässige Timestamp-Spalte? Delta Loads stehen und fallen mit der Delta-Identifikation in der Quelle. Sofort mit IT-Infrastruktur-Kollege und Quellsystem-Team klären!</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Delta-Identifikation — hybride Strategie pro Tabelle</div>
+    <table>
+      <tr><th style="width:20%">Strategie</th><th style="width:28%">Funktionsweise</th><th style="width:22%">Voraussetzung</th><th style="width:30%">Empfehlung</th></tr>
+      <tr><td><strong>Timestamp-basiert</strong></td><td><code>WHERE last_modified &gt; :last_run</code></td><td>Zuverlässige Timestamp-Spalte in Quelle</td><td><span class="tag tag-green">Bevorzugt Phase I</span> — einfach, robust</td></tr>
+      <tr><td><strong>ID-basiert</strong></td><td><code>WHERE id &gt; :last_max_id</code></td><td>Monoton steigende ID, nur Inserts</td><td>Gut für Bewegungsdaten (Buchungen)</td></tr>
+      <tr><td><strong>Full Reload</strong></td><td>Immer alles laden, vorherigen Stand ersetzen</td><td>Keine</td><td>Nur für kleine Stammdaten-Tabellen</td></tr>
+      <tr><td><strong>PK-Vergleich (MERGE)</strong></td><td>Staging-Load + MERGE/UPSERT mit Vorstand</td><td>Primary Keys in Quelle</td><td>Fallback wenn kein Timestamp vorhanden</td></tr>
+      <tr style="background:#faeeda"><td><strong>CDC</strong> <span class="tag tag-amber">Phase II / Vormerk</span></td><td>Redo-Log / Journal lesen — jede INSERT/UPDATE/DELETE mit Timestamp</td><td>Oracle LogMiner Berechtigung; AS/400 Journaling aktiv</td><td>Mächtigste Lösung — Klärungsbedarf mit IT und Mutterkonzern</td></tr>
+    </table>
+    <div class="dispdb-note"><strong>Hybride Metadaten-Strategie (empfohlen):</strong> JSON oder SQL-Tabelle pflegt pro Tabelle die Delta-Strategie + Parameter. ForEach-Pipeline wählt automatisch den passenden Ansatz. Neue Tabelle = ein Eintrag in der Metadaten-Tabelle, keine Pipeline-Änderung nötig.</div>
+    <div class="warn-note" style="margin-top:8px"><strong>📌 CDC-Vormerk (für spätere Vertiefung mit IT):</strong> Oracle LogMiner liest Redo-Log → jede DB-Operation extrahierbar. AS/400 Journal (IBM-nativ) ebenso mächtig. Beide brauchen spezielle DB-Berechtigungen → vor Phase-II-Planung mit IT-Infrastruktur-Kollege und Mutterkonzern klären.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Doing-Schritte — wenn die DNA-Plattform steht</div>
+    <div class="grid-4">
+      <div class="card card-green">
+        <h3>1 — SHIR installieren</h3>
+        <ul>
+          <li>Fabric → Integration Runtimes → Neu → Self-hosted</li>
+          <li>Installationskey kopieren</li>
+          <li>Installer auf VM ausführen, Key eingeben</li>
+          <li>Status grün = verbunden</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>2 — Linked Services</h3>
+        <ul>
+          <li>Data Factory → Linked Services → Neu</li>
+          <li>Connector wählen (ODBC / Oracle / ADLS)</li>
+          <li>SHIR zuweisen (Quellen), Parameter eingeben</li>
+          <li>Credentials → Key Vault referenzieren</li>
+          <li>"Test Connection" → muss grün sein!</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>3 — Pipeline bauen</h3>
+        <ul>
+          <li>Data Factory → Pipelines → Neu</li>
+          <li>Metadaten-Lookup → ForEach → Copy Activity</li>
+          <li>Copy Activity parametrisiert (Tabelle, Zeitfenster)</li>
+          <li>onFailure → Web Activity (Benachrichtigung)</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>4 — Trigger setzen</h3>
+        <ul>
+          <li>Full Load: Manual Trigger</li>
+          <li>Delta: Tumbling Window Trigger</li>
+          <li>Zeitzone: Europe/Berlin</li>
+          <li>Monitor Hub: erste Runs prüfen</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer"><span>MS Fabric Crashkurs · Stefan · Woche 2</span><span>Seite 3 — Ingest-Strategie, Delta-Identifikation, Doing-Schritte</span></div>
+</div>
+
+</body>
+</html>
