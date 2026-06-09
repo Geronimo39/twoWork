@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MS Fabric – Cheat-Sheet Woche 1</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a1a; background: #f4f4f4; }
+
+  .page {
+    width: 297mm; min-height: 210mm;
+    background: white;
+    margin: 12px auto;
+    padding: 14mm 14mm 12mm 14mm;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    page-break-after: always;
+  }
+
+  /* Header */
+  .page-header {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 3px solid #5c3eb5;
+    padding-bottom: 8px; margin-bottom: 14px;
+  }
+  .page-header h1 { font-size: 18px; color: #5c3eb5; font-weight: 700; }
+  .page-header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+  .badge {
+    background: #5c3eb5; color: white;
+    font-size: 10px; font-weight: 600;
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  /* Section */
+  .section { margin-bottom: 14px; }
+  .section-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #5c3eb5;
+    border-left: 4px solid #5c3eb5;
+    padding-left: 8px; margin-bottom: 8px;
+  }
+
+  /* Grid layouts */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+
+  /* Cards */
+  .card {
+    border-radius: 8px; padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+  }
+  .card h3 { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .card p, .card li { font-size: 11px; color: #444; line-height: 1.55; }
+  .card ul { padding-left: 14px; }
+
+  .card-purple { background: #f3f0fd; border-color: #c5b8f5; }
+  .card-purple h3 { color: #4a2fa0; }
+  .card-teal   { background: #e8f7f2; border-color: #7dd4b8; }
+  .card-teal   h3 { color: #0a6e51; }
+  .card-coral  { background: #fdf0ec; border-color: #f4b8a0; }
+  .card-coral  h3 { color: #8a3318; }
+  .card-blue   { background: #e8f2fb; border-color: #90c0ea; }
+  .card-blue   h3 { color: #0d4a8a; }
+  .card-amber  { background: #fdf5e6; border-color: #f5cc7a; }
+  .card-amber  h3 { color: #7a4a08; }
+  .card-gray   { background: #f5f5f5; border-color: #d0d0d0; }
+  .card-gray   h3 { color: #333; }
+  .card-green  { background: #eaf5e0; border-color: #9dcc6e; }
+  .card-green  h3 { color: #2e5a0a; }
+
+  /* Highlight box */
+  .highlight {
+    background: #fdf5e6; border: 1px solid #f5cc7a;
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 11px; color: #555; margin-bottom: 10px;
+  }
+  .highlight strong { color: #7a4a08; }
+
+  /* Arrow flow */
+  .flow {
+    display: flex; align-items: center; gap: 6px;
+    flex-wrap: wrap; margin: 6px 0;
+  }
+  .flow-item {
+    background: #5c3eb5; color: white;
+    border-radius: 6px; padding: 4px 10px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .flow-item.gray { background: #888; }
+  .flow-item.teal { background: #0f6e56; }
+  .flow-item.coral { background: #993c1d; }
+  .flow-item.blue { background: #185fa5; }
+  .flow-item.amber { background: #854f0b; }
+  .flow-arrow { color: #999; font-size: 16px; font-weight: 300; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th {
+    background: #5c3eb5; color: white;
+    padding: 6px 10px; text-align: left; font-weight: 600;
+  }
+  td { padding: 5px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #fafafa; }
+  td strong { color: #333; }
+
+  /* Tag pills */
+  .pill {
+    display: inline-block;
+    font-size: 10px; padding: 1px 7px; border-radius: 10px;
+    margin: 1px 2px;
+    font-weight: 600;
+  }
+  .pill-purple { background: #e8e3fc; color: #4a2fa0; }
+  .pill-teal   { background: #d4f0e6; color: #0a6e51; }
+  .pill-coral  { background: #fbe0d4; color: #8a3318; }
+  .pill-gray   { background: #ebebeb; color: #444; }
+
+  /* Footer */
+  .page-footer {
+    border-top: 1px solid #ddd; margin-top: 12px;
+    padding-top: 6px;
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: #999;
+  }
+  .dispdb-note {
+    background: #fdf0ec; border: 1px solid #f4b8a0;
+    border-radius: 6px; padding: 6px 10px;
+    font-size: 11px; color: #6b2a10;
+    margin-top: 8px;
+  }
+  .dispdb-note strong { color: #8a3318; }
+
+  @media print {
+    body { background: white; }
+    .page { box-shadow: none; margin: 0; page-break-after: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ SEITE 1 -->
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>MS Fabric — Cheat-Sheet Woche 1</h1>
+      <div class="subtitle">Architektur · OneLake · Lakehouse · Workspace · Capacity</div>
+    </div>
+    <div class="badge">Seite 1 / 3</div>
+  </div>
+
+  <!-- Was ist Fabric -->
+  <div class="section">
+    <div class="section-title">Was ist Microsoft Fabric?</div>
+    <div class="highlight">
+      <strong>Kernaussage:</strong> Fabric ist eine einheitliche SaaS-Datenplattform — <strong>ein Speicher, fünf Workload-Engines, eine Governance-Schicht.</strong>
+      Vorher: Azure Data Factory + Synapse + Power BI + ADLS = vier getrennte Dienste. Jetzt: alles unter einem Dach.
+    </div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Fabric löst dieses Problem</h3>
+        <ul>
+          <li>Früher: Daten zwischen ADF, Synapse, PBI kopieren</li>
+          <li>Früher: Separates IAM pro Dienst</li>
+          <li>Früher: Getrennte Speicher → Inkonsistenz</li>
+          <li><strong>Jetzt: Eine Kopie der Daten, alle Workloads</strong></li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>Architektur in 3 Schichten</h3>
+        <ul>
+          <li><strong>Oben:</strong> 5 Workload Engines (SaaS)</li>
+          <li><strong>Mitte:</strong> Kapazität &amp; Governance</li>
+          <li><strong>Unten:</strong> OneLake (Speicherfundament)</li>
+        </ul>
+        <p style="margin-top:6px; font-size:10px; color:#888">Databricks ist <em>extern</em> — kein nativer Fabric-Bestandteil</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 Engines -->
+  <div class="section">
+    <div class="section-title">Die 5 Workload Engines</div>
+    <div class="grid-3">
+      <div class="card card-purple">
+        <h3>🔁 Data Factory</h3>
+        <ul>
+          <li>Ingest &amp; Orchestrierung</li>
+          <li>Pipelines, Copy Activity</li>
+          <li>SHIR für On-Prem/Legacy</li>
+          <li class="pill pill-coral">dispDB: AS/400 &amp; Oracle</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>⚙️ Data Engineering</h3>
+        <ul>
+          <li>Notebooks (PySpark/Python)</li>
+          <li>Spark-basierte Transformation</li>
+          <li>Lakehouses erstellen &amp; befüllen</li>
+          <li class="pill pill-gray">dispDB: via Databricks ersetzt</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>🗄️ Data Warehouse</h3>
+        <ul>
+          <li>T-SQL auf OneLake</li>
+          <li>Für SQL-first-Teams</li>
+          <li>Kein Spark, nur SQL</li>
+          <li class="pill pill-gray">dispDB: nicht primär</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>⚡ Real-Time Intelligence</h3>
+        <ul>
+          <li>Streaming-Daten (Kafka, EventHub)</li>
+          <li>KQL-Datenbank</li>
+          <li class="pill pill-gray">dispDB: nicht relevant</li>
+        </ul>
+      </div>
+      <div class="card card-purple">
+        <h3>📊 Power BI</h3>
+        <ul>
+          <li>Reporting &amp; Visualisierung</li>
+          <li>DirectLake-Modus (neu in Fabric)</li>
+          <li>Semantic Models</li>
+          <li class="pill pill-coral">dispDB: Vorstandsreport</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>🔗 Databricks (extern)</h3>
+        <ul>
+          <li>Kein nativer Fabric-Bestandteil</li>
+          <li>Kooperation via Shortcut auf ADLS</li>
+          <li>Oder: gemeinsamer Azure Data Lake</li>
+          <li class="pill pill-coral">dispDB: Medallion Bronze→Gold</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- dispDB Architektur -->
+  <div class="section">
+    <div class="section-title">dispDB — Datenfluss im Überblick</div>
+    <div class="flow">
+      <div class="flow-item gray">AS/400</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item gray">Oracle 11g</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item amber">SHIR (VM)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item">Data Factory</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item gray">ADLS Landing</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item gray">Databricks</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-item coral">Gold Layer</div>
+      <div class="flow-arrow">→ Shortcut →</div>
+      <div class="flow-item blue">Power BI</div>
+    </div>
+    <div class="dispdb-note">
+      <strong>Wichtig:</strong> Databricks übernimmt die <strong>komplette Medallion-Architektur</strong> (Bronze → Silver → Gold).
+      Fabric (Data Factory) ist verantwortlich für den Ingest. Power BI konsumiert den fertigen Gold Layer via Shortcut — kein Datenmove.
+      SHIR-VM: Standort (On-Premise oder Azure) noch zu klären — hat Einfluss auf Firewall-Konfiguration.
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>MS Fabric Crashkurs · Stefan · Woche 1</span>
+    <span>Seite 1 — Architektur &amp; Überblick</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ SEITE 2 -->
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>MS Fabric — Cheat-Sheet Woche 1</h1>
+      <div class="subtitle">Data Lake · OneLake · Lakehouse · Data Warehouse — Begriffe sauber unterscheiden</div>
+    </div>
+    <div class="badge">Seite 2 / 3</div>
+  </div>
+
+  <!-- Evolutionsstufen -->
+  <div class="section">
+    <div class="section-title">Die Evolution: Von Warehouse → Lake → Lakehouse</div>
+    <table>
+      <tr>
+        <th style="width:18%">Konzept</th>
+        <th style="width:27%">Was es ist</th>
+        <th style="width:27%">Stärken</th>
+        <th style="width:28%">Schwächen</th>
+      </tr>
+      <tr>
+        <td><strong>Data Warehouse</strong><br><span class="pill pill-gray">klassisch</span></td>
+        <td>Strukturierter SQL-Store, striktes Schema. Daten müssen vor dem Laden transformiert werden (ETL).</td>
+        <td>Schnell, ACID, SQL-fähig, hohe Datenqualität</td>
+        <td>Teuer, unflexibel, nur strukturierte Daten, Skalierung schwierig</td>
+      </tr>
+      <tr>
+        <td><strong>Data Lake</strong><br><span class="pill pill-gray">ADLS / S3</span></td>
+        <td>Reines Dateisystem in der Cloud. Alles rein — roh, unstrukturiert, strukturiert. Kein Schema erzwungen.</td>
+        <td>Günstig, flexibel, alle Datentypen, massiv skalierbar</td>
+        <td>Kein Schema, keine Transaktionen, wird zum "Data Swamp", schwer abfragbar</td>
+      </tr>
+      <tr>
+        <td><strong>Lakehouse</strong><br><span class="pill pill-teal">Fabric / Databricks</span></td>
+        <td>Dateisystem (Lake) + Transaktions-/ Schema-Layer (Warehouse). Technisches Herzstück: Delta Lake.</td>
+        <td>Günstig + flexibel + ACID + SQL + Schema. Kein Datenmove zwischen Engines nötig.</td>
+        <td>Komplexeres Setup, neueres Konzept (weniger Legacy-Support)</td>
+      </tr>
+      <tr>
+        <td><strong>Data Warehouse in Fabric</strong><br><span class="pill pill-purple">Fabric-Artefakt</span></td>
+        <td>T-SQL-Warehouse direkt auf OneLake. Klassisches SQL-Interface, aber Speicher = OneLake (Delta/Parquet).</td>
+        <td>Vertraut für SQL-Teams, kein separater Speicher</td>
+        <td>Kein Spark, kein PySpark, nur SQL</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- OneLake -->
+  <div class="section">
+    <div class="section-title">OneLake — das Speicherfundament von Fabric</div>
+    <div class="grid-2">
+      <div class="card card-teal">
+        <h3>Was OneLake ist</h3>
+        <ul>
+          <li><strong>Ein</strong> logischer Data Lake pro Tenant</li>
+          <li>Technisch: ADLS Gen2-kompatibel</li>
+          <li>Format: Delta / Parquet (offen, kein Vendor Lock-in)</li>
+          <li>Workspaces = Ordner/Container darin</li>
+          <li>Alle 5 Engines lesen <em>dieselben</em> Dateien — kein Kopieren</li>
+        </ul>
+      </div>
+      <div class="card card-teal">
+        <h3>Shortcuts — das Killer-Feature</h3>
+        <ul>
+          <li>Virtueller Zeiger auf externen Speicher (ADLS, AWS S3, GCS)</li>
+          <li>Daten bleiben physisch wo sie sind</li>
+          <li>In Fabric sehen sie aus wie lokale Dateien</li>
+          <li><strong>dispDB:</strong> Databricks schreibt Gold auf ADLS → Shortcut macht ihn in Fabric sichtbar</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid-2" style="margin-top:8px">
+      <div class="card card-gray">
+        <h3>OneLake vs. ADLS</h3>
+        <ul>
+          <li>ADLS = physischer Azure-Speicher (Data Lake)</li>
+          <li>OneLake = logische Abstraktion darüber in Fabric</li>
+          <li>Databricks arbeitet direkt auf ADLS</li>
+          <li>Fabric "sieht" denselben Speicher via Shortcut</li>
+        </ul>
+      </div>
+      <div class="card card-gray">
+        <h3>OneLake vs. Data Lake (allgemein)</h3>
+        <ul>
+          <li>Data Lake = generisches Konzept (Dateisystem in Cloud)</li>
+          <li>OneLake = Microsofts konkrete Implementierung in Fabric</li>
+          <li>OneLake ist <em>immer</em> ein Data Lake</li>
+          <li>Ein Data Lake ist <em>nicht immer</em> OneLake</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lakehouse Artefakt -->
+  <div class="section">
+    <div class="section-title">Fabric Lakehouse — das Artefakt im Workspace</div>
+    <div class="highlight">
+      <strong>Merksatz:</strong> OneLake = der Speicher. Fabric Lakehouse = die intelligente Sicht darauf.
+      Ein Lakehouse-Artefakt gibt dir <strong>zwei Zugangswege zur selben Datenbasis</strong> — Dateizugriff UND SQL.
+    </div>
+    <div class="grid-2">
+      <div class="card card-coral">
+        <h3>Zugangsweg 1 — Dateizugriff</h3>
+        <ul>
+          <li>Für Notebooks &amp; Spark (PySpark, Python)</li>
+          <li>Du siehst die rohen Delta-Parquet-Dateien</li>
+          <li>Pfad-basierter Zugriff: <code>abfss://...</code></li>
+          <li>Geeignet für Transformation (Bronze→Silver)</li>
+        </ul>
+      </div>
+      <div class="card card-blue">
+        <h3>Zugangsweg 2 — SQL Analytics Endpoint</h3>
+        <ul>
+          <li>Automatisch generierter SQL-Endpunkt</li>
+          <li>Du siehst Tabellen wie in einem Warehouse</li>
+          <li>T-SQL-Abfragen ohne Extra-Setup</li>
+          <li>Geeignet für Power BI Semantic Models</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>MS Fabric Crashkurs · Stefan · Woche 1</span>
+    <span>Seite 2 — Data Lake / OneLake / Lakehouse</span>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════ SEITE 3 -->
+<div class="page">
+  <div class="page-header">
+    <div>
+      <h1>MS Fabric — Cheat-Sheet Woche 1</h1>
+      <div class="subtitle">Workspace · Capacity · Managed vs. External Tables · Doing-Schritte</div>
+    </div>
+    <div class="badge">Seite 3 / 3</div>
+  </div>
+
+  <!-- Workspace & Capacity -->
+  <div class="section">
+    <div class="section-title">Workspace &amp; Capacity</div>
+    <div class="grid-2">
+      <div class="card card-purple">
+        <h3>Workspace</h3>
+        <ul>
+          <li>Organisationscontainer für alle Fabric-Artefakte</li>
+          <li>Enthält: Lakehouses, Pipelines, Reports, Notebooks</li>
+          <li>Berechtigungen werden auf Workspace-Ebene vergeben</li>
+          <li>Entspricht einem "Projekt" — z.B. <em>dispDB-Workspace</em></li>
+          <li>Mehrere Workspaces pro Tenant möglich</li>
+          <li>Jeder User hat einen persönlichen "My Workspace"</li>
+        </ul>
+      </div>
+      <div class="card card-amber">
+        <h3>Capacity (F-SKU)</h3>
+        <ul>
+          <li>Rechenleistung, gemessen in <strong>Capacity Units (CUs)</strong></li>
+          <li>Jeder Workspace braucht eine zugeordnete Capacity</li>
+          <li>Ohne Capacity: keine Workload-Ausführung möglich</li>
+          <li>Wird per Terraform provisioniert (DNA-Platform-Team)</li>
+          <li>Trial: 64 CU, 60 Tage kostenlos</li>
+          <li><strong>dispDB:</strong> Capacity kommt vom Mutterkonzern</li>
+        </ul>
+      </div>
+    </div>
+    <div class="dispdb-note" style="margin-top:8px">
+      <strong>Für dispDB:</strong> Sobald der Mutterkonzern den Tenant aufgesetzt und eine Capacity provisioniert hat, kann der dispDB-Workspace angelegt und alle 5 Engines sofort genutzt werden. Netzwerkkonfiguration (Firewall) ist eure einzige Aufgabe in der Infrastruktur-Phase.
+    </div>
+  </div>
+
+  <!-- Managed vs External Tables -->
+  <div class="section">
+    <div class="section-title">Managed vs. External Tables</div>
+    <table>
+      <tr>
+        <th style="width:20%">Eigenschaft</th>
+        <th style="width:38%">Managed Table</th>
+        <th style="width:42%">External Table</th>
+      </tr>
+      <tr>
+        <td><strong>Datenkontrolle</strong></td>
+        <td>System verwaltet Speicherort</td>
+        <td>Du gibst expliziten Pfad an</td>
+      </tr>
+      <tr>
+        <td><strong>DROP TABLE</strong></td>
+        <td>Löscht Metadaten <em>und</em> Dateidaten</td>
+        <td>Löscht nur Metadaten — Daten bleiben!</td>
+      </tr>
+      <tr>
+        <td><strong>Pfad</strong></td>
+        <td>Intern, automatisch vergeben</td>
+        <td><code>abfss://gold@storage.dfs.core.windows.net/tabelle/</code></td>
+      </tr>
+      <tr>
+        <td><strong>Multi-Tool-Zugriff</strong></td>
+        <td>Nur vom eigenen System gut erreichbar</td>
+        <td>Databricks <em>und</em> Fabric lesen dieselben Dateien</td>
+      </tr>
+      <tr>
+        <td><strong>Typischer Einsatz</strong></td>
+        <td>Temporäre Daten, interne Verarbeitung, Bronze/Silver</td>
+        <td>Gold Layer, geteilte Daten zwischen Systemen</td>
+      </tr>
+      <tr>
+        <td><strong>dispDB-Empfehlung</strong></td>
+        <td>Bronze &amp; Silver in Databricks</td>
+        <td><strong>Gold Layer in Databricks</strong> → Fabric-Shortcut möglich</td>
+      </tr>
+    </table>
+    <div class="dispdb-note" style="margin-top:8px">
+      <strong>Warum External Tables für Gold kritisch sind:</strong> Nur wenn Databricks den Gold Layer als External Table auf einem definierten ADLS-Pfad anlegt, kann Fabric via Shortcut darauf zeigen — ohne Datenkopie. Bei Managed Tables liegt der Pfad intern und ist für Fabric nicht direkt adressierbar.
+    </div>
+  </div>
+
+  <!-- Doing-Schritte -->
+  <div class="section">
+    <div class="section-title">Doing-Schritte — wenn die DNA-Plattform steht</div>
+    <div class="grid-2">
+      <div class="card card-green">
+        <h3>Schritt 1 — Workspace einrichten</h3>
+        <ul>
+          <li>app.fabric.microsoft.com → Workspace erstellen</li>
+          <li>Name: z.B. <em>dispDB-Workspace</em></li>
+          <li>Capacity zuweisen (vom Mutterkonzern bereitgestellt)</li>
+          <li>Workspace Roles vergeben (Admin, Member, Contributor)</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>Schritt 2 — Lakehouse anlegen</h3>
+        <ul>
+          <li>Im Workspace: Neu → Lakehouse</li>
+          <li>Name: z.B. <em>dispDB_Lakehouse</em></li>
+          <li>Automatisch: Files-Bereich + Tables-Bereich + SQL Endpoint</li>
+          <li>Ordnerstruktur anlegen: /bronze / /silver</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>Schritt 3 — Shortcut auf Gold Layer</h3>
+        <ul>
+          <li>Im Lakehouse: Neu → Shortcut</li>
+          <li>Quelle: Azure Data Lake Storage Gen2</li>
+          <li>ADLS-URL + Pfad zum Gold-Layer-Ordner eingeben</li>
+          <li>Authentifizierung: Service Principal oder Managed Identity</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <h3>Schritt 4 — Power BI verbinden</h3>
+        <ul>
+          <li>Im Lakehouse: SQL Analytics Endpoint öffnen</li>
+          <li>Power BI → Semantic Model erstellen</li>
+          <li>DirectLake-Modus wählen (kein Datenmove!)</li>
+          <li>Report auf Basis des Semantic Models bauen</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Begriffe Zusammenfassung -->
+  <div class="section">
+    <div class="section-title">Begriffe auf einen Blick</div>
+    <table>
+      <tr>
+        <th>Begriff</th>
+        <th>Ein-Satz-Definition</th>
+      </tr>
+      <tr><td><strong>Data Lake</strong></td><td>Günstiges Cloud-Dateisystem für alle Datentypen — flexibel, aber ohne Schema oder Transaktionen.</td></tr>
+      <tr><td><strong>Data Warehouse</strong></td><td>Strukturierter, SQL-fähiger Datenspeicher mit ACID-Transaktionen — teuer, aber schnell und zuverlässig.</td></tr>
+      <tr><td><strong>Lakehouse</strong></td><td>Synthese: Dateispeicher (Lake) + Transaktionen &amp; Schema (Warehouse) via Delta Lake.</td></tr>
+      <tr><td><strong>OneLake</strong></td><td>Microsofts einziger, zentraler Data Lake pro Fabric-Tenant — Fundament für alle 5 Engines.</td></tr>
+      <tr><td><strong>Fabric Lakehouse</strong></td><td>Fabric-Artefakt im Workspace: gibt OneLake-Daten einen SQL-Endpoint und Dateizugriff zugleich.</td></tr>
+      <tr><td><strong>Delta Lake</strong></td><td>Offenes Tabellenformat (Parquet + Transaktionslog) — macht einen Data Lake ACID-fähig.</td></tr>
+      <tr><td><strong>Shortcut</strong></td><td>Virtueller Zeiger auf externen Speicher (ADLS, S3) — Daten bleiben wo sie sind, Fabric sieht sie lokal.</td></tr>
+      <tr><td><strong>Capacity</strong></td><td>Rechenleistung (in CUs) für Fabric-Workloads — muss jedem Workspace zugewiesen sein.</td></tr>
+      <tr><td><strong>Workspace</strong></td><td>Organisationscontainer in Fabric für alle Artefakte eines Projekts — mit gemeinsamen Rollen &amp; Berechtigungen.</td></tr>
+      <tr><td><strong>SHIR</strong></td><td>Self-hosted Integration Runtime — Brücke zwischen Fabric Data Factory und On-Prem-/Legacy-Quellen.</td></tr>
+      <tr><td><strong>DirectLake</strong></td><td>Power BI-Modus in Fabric: liest Delta-Dateien direkt aus OneLake — kein Import, kein DirectQuery-Overhead.</td></tr>
+    </table>
+  </div>
+
+  <div class="page-footer">
+    <span>MS Fabric Crashkurs · Stefan · Woche 1</span>
+    <span>Seite 3 — Workspace / Capacity / Managed vs. External / Doing-Schritte</span>
+  </div>
+</div>
+
+</body>
+</html>
