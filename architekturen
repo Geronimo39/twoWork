@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zielarchitektur Versicherung — Business Transformation Workshop</title>
+<style>
+  :root {
+    --c-bg: #ffffff;
+    --c-bg2: #f7f6f2;
+    --c-bg3: #f0efe9;
+    --c-text: #1a1a18;
+    --c-text2: #5f5e5a;
+    --c-border: rgba(0,0,0,0.12);
+    --c-teal: #1D9E75;
+    --c-teal-bg: #E1F5EE;
+    --c-blue: #185FA5;
+    --c-blue-bg: #E6F1FB;
+    --c-purple: #534AB7;
+    --c-purple-bg: #EEEDFE;
+    --c-amber: #BA7517;
+    --c-amber-bg: #FAEEDA;
+    --c-coral: #993C1D;
+    --c-coral-bg: #FAECE7;
+    --c-gray: #5F5E5A;
+    --c-gray-bg: #F1EFE8;
+    --c-green: #3B6D11;
+    --c-green-bg: #EAF3DE;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 8px rgba(0,0,0,0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --c-bg: #1c1c1a;
+      --c-bg2: #242420;
+      --c-bg3: #2c2c28;
+      --c-text: #e8e6de;
+      --c-text2: #9c9a92;
+      --c-border: rgba(255,255,255,0.10);
+      --c-teal: #5DCAA5;
+      --c-teal-bg: #04342C;
+      --c-blue: #85B7EB;
+      --c-blue-bg: #042C53;
+      --c-purple: #AFA9EC;
+      --c-purple-bg: #26215C;
+      --c-amber: #EF9F27;
+      --c-amber-bg: #412402;
+      --c-coral: #F0997B;
+      --c-coral-bg: #4A1B0C;
+      --c-gray: #B4B2A9;
+      --c-gray-bg: #2C2C2A;
+      --c-green: #97C459;
+      --c-green-bg: #173404;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-size: 15px;
+    line-height: 1.65;
+  }
+  .page-header {
+    background: var(--c-bg2);
+    border-bottom: 1px solid var(--c-border);
+    padding: 2.5rem 2rem 2rem;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .page-header .meta {
+    font-size: 12px;
+    color: var(--c-text2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.5rem;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+  .page-header .subtitle {
+    color: var(--c-text2);
+    font-size: 14px;
+  }
+  nav {
+    background: var(--c-bg2);
+    border-bottom: 1px solid var(--c-border);
+    padding: 0 2rem;
+    max-width: 960px;
+    margin: 0 auto;
+    display: flex;
+    gap: 0;
+    flex-wrap: wrap;
+  }
+  nav a {
+    display: block;
+    padding: 0.75rem 1rem;
+    font-size: 13px;
+    color: var(--c-text2);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  nav a:hover { color: var(--c-text); border-bottom-color: var(--c-border); }
+  .main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  section { margin-bottom: 3.5rem; }
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding-top: 0.25rem;
+    border-top: 2px solid var(--c-teal);
+    padding-top: 0.75rem;
+  }
+  h3 { font-size: 16px; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+  p { color: var(--c-text); margin-bottom: 0.75rem; }
+  .lead { font-size: 15px; color: var(--c-text2); margin-bottom: 1.5rem; border-left: 3px solid var(--c-teal); padding-left: 1rem; }
+
+  .arch-card {
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    margin-bottom: 2.5rem;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .arch-card-header {
+    padding: 1rem 1.25rem;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .arch-card-header.teal { background: var(--c-teal-bg); }
+  .arch-card-header.blue { background: var(--c-blue-bg); }
+  .arch-card-header.purple { background: var(--c-purple-bg); }
+  .arch-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    min-width: 60px;
+  }
+  .arch-card-header h3 { margin: 0; font-size: 16px; }
+  .arch-card-header .badge {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-green { background: var(--c-green-bg); color: var(--c-green); }
+  .badge-amber { background: var(--c-amber-bg); color: var(--c-amber); }
+  .badge-purple { background: var(--c-purple-bg); color: var(--c-purple); }
+  .arch-card-body { padding: 1.25rem; }
+  .arch-card-body p { font-size: 14px; }
+
+  .diagram-wrap {
+    background: var(--c-bg2);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+  }
+  svg { display: block; max-width: 100%; height: auto; }
+
+  .layer-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+  @media (max-width: 600px) { .layer-grid { grid-template-columns: 1fr; } }
+  .layer-box {
+    background: var(--c-bg2);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+  }
+  .layer-box .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  .layer-box .label.teal { color: var(--c-teal); }
+  .layer-box .label.blue { color: var(--c-blue); }
+  .layer-box .label.purple { color: var(--c-purple); }
+  .layer-box .label.amber { color: var(--c-amber); }
+  .layer-box .label.coral { color: var(--c-coral); }
+  .layer-box .label.gray { color: var(--c-gray); }
+  .layer-box ul { padding-left: 1.1rem; font-size: 13px; color: var(--c-text2); }
+  .layer-box ul li { margin-bottom: 0.2rem; }
+
+  .verdict-box {
+    border-radius: var(--radius);
+    padding: 0.85rem 1.1rem;
+    font-size: 13px;
+    margin-top: 1rem;
+    border-left: 3px solid;
+  }
+  .verdict-green { background: var(--c-green-bg); border-color: var(--c-green); color: var(--c-green); }
+  .verdict-amber  { background: var(--c-amber-bg);  border-color: var(--c-amber);  color: var(--c-amber);  }
+  .verdict-purple { background: var(--c-purple-bg); border-color: var(--c-purple); color: var(--c-purple); }
+
+  .decision-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 1rem 0;
+  }
+  .decision-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    background: var(--c-bg2);
+    border: 1px solid var(--c-border);
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .decision-table td {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--c-border);
+    vertical-align: top;
+  }
+  .decision-table tr:nth-child(even) td { background: var(--c-bg2); }
+  .ok  { color: var(--c-green);  font-weight: 600; }
+  .mid { color: var(--c-amber);  font-weight: 600; }
+  .no  { color: var(--c-coral);  font-weight: 600; }
+
+  .roadmap {
+    position: relative;
+    padding-left: 2rem;
+    margin: 1.5rem 0;
+  }
+  .roadmap::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: var(--c-border);
+  }
+  .rm-item {
+    position: relative;
+    margin-bottom: 1.5rem;
+  }
+  .rm-dot {
+    position: absolute;
+    left: -1.75rem;
+    top: 4px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--c-bg);
+  }
+  .rm-dot.teal   { background: var(--c-teal); }
+  .rm-dot.blue   { background: var(--c-blue); }
+  .rm-dot.purple { background: var(--c-purple); }
+  .rm-phase { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--c-text2); margin-bottom: 0.2rem; }
+  .rm-title { font-size: 15px; font-weight: 600; margin-bottom: 0.3rem; }
+  .rm-body  { font-size: 13px; color: var(--c-text2); }
+
+  .highlight-box {
+    background: var(--c-teal-bg);
+    border: 1px solid var(--c-teal);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    font-size: 14px;
+  }
+  .highlight-box strong { color: var(--c-teal); }
+
+  footer {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 2rem;
+    border-top: 1px solid var(--c-border);
+    font-size: 12px;
+    color: var(--c-text2);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="meta">Business Transformation · Systemarchitektur · Workshop-Vorbereitung</div>
+  <h1>Zielarchitektur Versicherung</h1>
+  <p class="subtitle">Drei Architekturvarianten für eine moderne Versicherungslandschaft — von Composable Insurance bis zur Intelligent Insurance Platform. Stand: Juni 2026.</p>
+</div>
+
+<nav>
+  <a href="#ausgangslage">Ausgangslage</a>
+  <a href="#sor">System of Record</a>
+  <a href="#arch1">Architektur 1</a>
+  <a href="#arch2">Architektur 2</a>
+  <a href="#arch3">Architektur 3</a>
+  <a href="#cobra">Cobra / CRM</a>
+  <a href="#dx">Developer Experience</a>
+  <a href="#datamesh">Data Mesh</a>
+  <a href="#evolution">Evolutionspfad</a>
+  <a href="#skalierbarkeit">Skalierbarkeit</a>
+</nav>
+
+<div class="main">
+
+<!-- AUSGANGSLAGE -->
+<section id="ausgangslage">
+  <h2>Ausgangslage &amp; gesetzter Rahmen</h2>
+  <p class="lead">Die heutige Systemlandschaft besteht aus bewährten, aber heterogenen Komponenten. Ziel ist eine Architektur, die schrittweise modernisiert werden kann, ohne einen Big-Bang-Wechsel zu erfordern.</p>
+
+  <div class="layer-grid">
+    <div class="layer-box">
+      <div class="label gray">Kernsysteme (gesetzt)</div>
+      <ul>
+        <li>AS/400 — Nicht-Leben + Zusammenführung Leben</li>
+        <li>Oracle 11g via msg-Life — Leben</li>
+        <li>Cobra CRM — führendes System <strong>ausschließlich für Maklerdaten</strong> (Maklerregister, IHK-Status, Provision)</li>
+        <li>M/Text — Drucksystem</li>
+        <li>X4-Server / BiPRO — Makler-Kommunikation</li>
+        <li>Inputmanagement-System</li>
+        <li>Extranet inkl. GDV-Daten</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label teal">Analytische Plattform (im Aufbau)</div>
+      <ul>
+        <li>dispDB = MS Fabric + Databricks on Azure</li>
+        <li>ADLS Gen2 als Storage-Layer</li>
+        <li>Medallion: Bronze → Silver → Gold</li>
+        <li>Unity Catalog, Delta Lake, Purview</li>
+        <li>Power BI (DirectLake)</li>
+        <li>Regulierung: DORA, BaFin/VAIT, DSGVO</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label amber">Externe Dienste (einzubinden)</div>
+      <ul>
+        <li>IHK — Makler-Registrierungsnummern</li>
+        <li>ABIS — Adressprüfung</li>
+        <li>ZürsGeo — Zonierungsdaten</li>
+        <li>GDV-Datenaustausch</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label purple">Geplant (nahe Zukunft)</div>
+      <ul>
+        <li>Kundenportal (Direkt + Makler)</li>
+        <li>Sachbearbeiter-Frontend</li>
+        <li>Portal ersetzt Extranet-Funktion</li>
+        <li>API-Layer auf Kernsysteme (Lesen + Schreiben)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>System-of-Record-Aufteilung (nicht verhandelbar):</strong><br><br>
+    <strong>AS/400</strong> ist führendes System für <strong>Nicht-Leben</strong> (Policen NL, Bestand, Prämien, Schäden NL) —
+    <strong>Oracle / msg-Life</strong> ist führendes System für <strong>Leben</strong> (Policen L, Neugeschäft, Bestand L) —
+    <strong>Cobra CRM</strong> ist führendes System <strong>ausschließlich für Maklerdaten</strong> (Maklerregister, IHK-Status, Provision).<br><br>
+    <strong>Kernentscheidung dispDB:</strong> Die dispDB ist eine rein analytische Datenbank — kein Schreibpfad vom Kundenportal über die dispDB. Das Kundenportal liest und schreibt direkt auf die Kernsysteme über einen dedizierten API-Layer. Die dispDB befüllt ausschließlich Power BI und interne Berichte.
+  </div>
+</section>
+
+<!-- ARCHITEKTUR 1 -->
+<section id="arch1">
+  <div class="arch-card">
+    <div class="arch-card-header teal">
+      <span class="arch-num">Variante 1</span>
+      <h3>Composable Insurance</h3>
+      <span class="badge badge-green">Empfohlen: Etappenziel</span>
+    </div>
+    <div class="arch-card-body">
+      <p>Fachlich geschnittene Domain-Services, verbunden über Azure Service Bus. Jede Domäne (Policy, Customer, Claims, Partner) ist ein eigenständiger Service mit eigenem Datenspeicher. Der Azure API Management Gateway ist die einzige Außenfassade.</p>
+
+      <div class="diagram-wrap">
+        <svg viewBox="0 0 860 620" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+          <!-- Engagement layer -->
+          <rect x="10" y="10" width="840" height="14" rx="4" fill="none" stroke="#e0ddd4" stroke-width="0.5"/>
+          <text x="430" y="21" text-anchor="middle" font-size="11" fill="#888780" font-family="system-ui,sans-serif">Engagement-Schicht</text>
+          <!-- Consumer boxes -->
+          <rect x="10" y="30" width="180" height="52" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.8"/>
+          <text x="100" y="51" text-anchor="middle" font-size="13" font-weight="600" fill="#3C3489" font-family="system-ui,sans-serif">Kundenportal</text>
+          <text x="100" y="67" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">Direkt + Makler</text>
+          <rect x="205" y="30" width="180" height="52" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.8"/>
+          <text x="295" y="51" text-anchor="middle" font-size="13" font-weight="600" fill="#3C3489" font-family="system-ui,sans-serif">Sachbearbeiter-FE</text>
+          <text x="295" y="67" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">Intern</text>
+          <rect x="400" y="30" width="180" height="52" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.8"/>
+          <text x="490" y="51" text-anchor="middle" font-size="13" font-weight="600" fill="#3C3489" font-family="system-ui,sans-serif">X4 / BiPRO</text>
+          <text x="490" y="67" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">Makler-Kanal</text>
+          <rect x="595" y="30" width="180" height="52" rx="8" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.8"/>
+          <text x="685" y="51" text-anchor="middle" font-size="13" font-weight="600" fill="#3C3489" font-family="system-ui,sans-serif">M/Text</text>
+          <text x="685" y="67" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">Druck + Output</text>
+          <!-- Arrows to APIM -->
+          <line x1="100" y1="82" x2="200" y2="124" stroke="#AFA9EC" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="295" y1="82" x2="340" y2="124" stroke="#AFA9EC" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="490" y1="82" x2="490" y2="124" stroke="#AFA9EC" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="685" y1="82" x2="640" y2="124" stroke="#AFA9EC" stroke-width="0.8" marker-end="url(#a1)"/>
+          <!-- APIM -->
+          <rect x="10" y="124" width="840" height="52" rx="8" fill="#E6F1FB" stroke="#378ADD" stroke-width="1"/>
+          <text x="430" y="145" text-anchor="middle" font-size="13" font-weight="600" fill="#0C447C" font-family="system-ui,sans-serif">Azure API Management</text>
+          <text x="430" y="163" text-anchor="middle" font-size="11" fill="#185FA5" font-family="system-ui,sans-serif">Auth · OAuth2/OIDC · Rate Limiting · Routing · Logging · mTLS</text>
+          <!-- Domain Services -->
+          <rect x="10" y="196" width="840" height="14" rx="4" fill="none" stroke="#e0ddd4" stroke-width="0.5"/>
+          <text x="430" y="207" text-anchor="middle" font-size="11" fill="#888780" font-family="system-ui,sans-serif">Domain-Services (fachlich geschnitten)</text>
+          <line x1="150" y1="176" x2="100" y2="214" stroke="#185FA5" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="300" y1="176" x2="295" y2="214" stroke="#185FA5" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="500" y1="176" x2="490" y2="214" stroke="#185FA5" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="650" y1="176" x2="685" y2="214" stroke="#185FA5" stroke-width="0.8" marker-end="url(#a1)"/>
+          <rect x="10" y="214" width="195" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.8"/>
+          <text x="107" y="236" text-anchor="middle" font-size="13" font-weight="600" fill="#085041" font-family="system-ui,sans-serif">Policy Domain</text>
+          <text x="107" y="253" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Vertrags-CRUD</text>
+          <text x="107" y="268" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Nicht-Leben + Leben</text>
+          <rect x="220" y="214" width="195" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.8"/>
+          <text x="317" y="236" text-anchor="middle" font-size="13" font-weight="600" fill="#085041" font-family="system-ui,sans-serif">Customer Domain</text>
+          <text x="317" y="253" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Stammdaten · Adressen</text>
+          <text x="317" y="268" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">DSGVO · Cobra-Sync</text>
+          <rect x="430" y="214" width="195" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.8"/>
+          <text x="527" y="236" text-anchor="middle" font-size="13" font-weight="600" fill="#085041" font-family="system-ui,sans-serif">Claims Domain</text>
+          <text x="527" y="253" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Schadensmeldung</text>
+          <text x="527" y="268" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Workflow · Status</text>
+          <rect x="640" y="214" width="210" height="72" rx="8" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.8"/>
+          <text x="745" y="236" text-anchor="middle" font-size="13" font-weight="600" fill="#085041" font-family="system-ui,sans-serif">Partner Domain</text>
+          <text x="745" y="253" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Makler · IHK-Prüfung</text>
+          <text x="745" y="268" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">SoR: Maklerdaten only</text>
+          <!-- Event Bus -->
+          <line x1="107" y1="286" x2="200" y2="336" stroke="#1D9E75" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="317" y1="286" x2="317" y2="336" stroke="#1D9E75" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="527" y1="286" x2="480" y2="336" stroke="#1D9E75" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="745" y1="286" x2="680" y2="336" stroke="#1D9E75" stroke-width="0.8" marker-end="url(#a1)"/>
+          <rect x="10" y="336" width="840" height="60" rx="8" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+          <text x="430" y="359" text-anchor="middle" font-size="13" font-weight="600" fill="#633806" font-family="system-ui,sans-serif">Azure Service Bus / Event Hub</text>
+          <text x="430" y="377" text-anchor="middle" font-size="11" fill="#854F0B" font-family="system-ui,sans-serif">Topics: policy · customer · claims · partner · payment · document · ext-services</text>
+          <!-- Backend Adapters -->
+          <rect x="10" y="416" width="840" height="14" rx="4" fill="none" stroke="#e0ddd4" stroke-width="0.5"/>
+          <text x="430" y="427" text-anchor="middle" font-size="11" fill="#888780" font-family="system-ui,sans-serif">Backend-Adapter (Anti-Corruption Layer)</text>
+          <line x1="200" y1="396" x2="107" y2="434" stroke="#BA7517" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="317" y1="396" x2="317" y2="434" stroke="#BA7517" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="480" y1="396" x2="490" y2="434" stroke="#BA7517" stroke-width="0.8" marker-end="url(#a1)"/>
+          <line x1="680" y1="396" x2="685" y2="434" stroke="#BA7517" stroke-width="0.8" marker-end="url(#a1)"/>
+          <rect x="10" y="434" width="185" height="64" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.8"/>
+          <text x="102" y="456" text-anchor="middle" font-size="12" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">AS/400 Adapter</text>
+          <text x="102" y="472" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">ODBC · RPG-Wrapper</text>
+          <text x="102" y="487" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">Nicht-Leben</text>
+          <rect x="208" y="434" width="185" height="64" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.8"/>
+          <text x="300" y="456" text-anchor="middle" font-size="12" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">Oracle Adapter</text>
+          <text x="300" y="472" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">JDBC · msg-Life API</text>
+          <text x="300" y="487" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">Leben</text>
+          <rect x="406" y="434" width="185" height="64" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.8"/>
+          <text x="498" y="456" text-anchor="middle" font-size="12" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">Ext. Dienste</text>
+          <text x="498" y="472" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">ABIS · ZürsGeo · IHK</text>
+          <text x="498" y="487" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">GDV · Inputmgmt.</text>
+          <rect x="604" y="434" width="246" height="64" rx="8" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="0.8"/>
+          <text x="727" y="456" text-anchor="middle" font-size="12" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">Cobra CRM Adapter</text>
+          <text x="727" y="472" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">REST API · Maklerführung</text>
+          <text x="727" y="487" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">Sync ↔ Partner Domain</text>
+          <!-- dispDB -->
+          <line x1="107" y1="498" x2="200" y2="540" stroke="#B4B2A9" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#a1)"/>
+          <line x1="300" y1="498" x2="340" y2="540" stroke="#B4B2A9" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#a1)"/>
+          <rect x="10" y="540" width="410" height="64" rx="8" fill="#E1F5EE" stroke="#1D9E75" stroke-width="1"/>
+          <text x="215" y="562" text-anchor="middle" font-size="13" font-weight="600" fill="#085041" font-family="system-ui,sans-serif">dispDB (MS Fabric + Databricks)</text>
+          <text x="215" y="579" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">Bronze → Silver → Gold · rein analytisch · read-only</text>
+          <rect x="434" y="540" width="416" height="64" rx="8" fill="#E6F1FB" stroke="#85B7EB" stroke-width="0.8"/>
+          <text x="642" y="562" text-anchor="middle" font-size="13" font-weight="600" fill="#0C447C" font-family="system-ui,sans-serif">Power BI · Executive Dashboard</text>
+          <text x="642" y="579" text-anchor="middle" font-size="11" fill="#185FA5" font-family="system-ui,sans-serif">DirectLake · KPIs · Vorstandsreporting</text>
+          <line x1="420" y1="572" x2="434" y2="572" stroke="#1D9E75" stroke-width="0.8" marker-end="url(#a1)"/>
+          <!-- Governance -->
+          <rect x="10" y="618" width="840" height="0" rx="8" fill="#FAECE7" stroke="#F0997B" stroke-width="0"/>
+        </svg>
+      </div>
+
+      <div class="layer-grid">
+        <div class="layer-box">
+          <div class="label teal">Stärken</div>
+          <ul>
+            <li>Industriestandard 2024/25 bei europ. Versicherern</li>
+            <li>Service Bus = DORA-Audit-Trail inklusive</li>
+            <li>Schrittweise Ablösung von Legacy möglich</li>
+            <li>Domain-Services unabhängig skalierbar</li>
+            <li>Azure-Stack konsistent, kein Vendor-Mix</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label amber">Herausforderungen</div>
+          <ul>
+            <li>AS/400-Adapter erfordert RPG-Know-how</li>
+            <li>Microservice-Betrieb braucht DevOps-Reife</li>
+            <li>Datenkonsistenz über Domänen (Saga-Pattern)</li>
+            <li>Initiale Investition in API-Design hoch</li>
+          </ul>
+        </div>
+      </div>
+      <div class="verdict-box verdict-green">Empfehlung: Architektur 1 als Etappenziel (2–3 Jahre). Realistischer Einstieg, bewährt, BaFin-tauglich.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITEKTUR 2 -->
+<section id="arch2">
+  <div class="arch-card">
+    <div class="arch-card-header blue">
+      <span class="arch-num">Variante 2</span>
+      <h3>Event-Sourced Real-Time Insurance</h3>
+      <span class="badge badge-amber">Zielbild: 4–6 Jahre</span>
+    </div>
+    <div class="arch-card-body">
+      <p>Kafka als unveränderliches Event-Log. Jeder Geschäftsvorfall ist ein persistenter Event. CQRS trennt Lese- und Schreibseite vollständig. Echtzeit-Pricing und Betrugsdetektierung sind strukturell eingebaut.</p>
+
+      <div class="layer-grid">
+        <div class="layer-box">
+          <div class="label blue">Kernprinzipien</div>
+          <ul>
+            <li>Event Sourcing: kein UPDATE, nur INSERT (Events)</li>
+            <li>CQRS: getrennte Read Models je Anwendungsfall</li>
+            <li>Kafka = Single Source of Truth (7-Tage-Retention)</li>
+            <li>Schema Registry erzwingt Datenqualität</li>
+            <li>Exactly-Once Semantics = DORA-konformer Audit-Trail</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label blue">Technologie-Stack</div>
+          <ul>
+            <li>Apache Kafka / Azure Event Hubs (Kafka-API)</li>
+            <li>Azure Stream Analytics (CEP)</li>
+            <li>Azure Cosmos DB (Event Store)</li>
+            <li>Azure PostgreSQL (Read Models)</li>
+            <li>Redis (Hot Cache, Scoring)</li>
+            <li>Databricks (Kafka-Consumer → Bronze)</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label teal">dispDB-Integration</div>
+          <ul>
+            <li>dispDB konsumiert Kafka-Topics direkt</li>
+            <li>Kein Batch-Ingest nötig — Stream-first</li>
+            <li>Bronze = Raw Events aus Kafka</li>
+            <li>Silver = Harmonisierte Domänenobjekte</li>
+            <li>Gold = KPI-Layer für Power BI</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label amber">Blockchain-Ergänzung</div>
+          <ul>
+            <li>GDV-Schadenspool on-chain (Hyperledger)</li>
+            <li>Makler-Provisionsnachweise unveränderlich</li>
+            <li>Parametrische Produkte via Smart Contract</li>
+            <li>Policen-Hash als Integritätsnachweis</li>
+          </ul>
+        </div>
+      </div>
+      <div class="verdict-box verdict-amber">Empfehlung: Architektur 2 als mittelfristiges Zielbild. Kafka-Einführung kann parallel zu Architektur 1 beginnen — schrittweise Migration.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITEKTUR 3 -->
+<section id="arch3">
+  <div class="arch-card">
+    <div class="arch-card-header purple">
+      <span class="arch-num">Variante 3</span>
+      <h3>Intelligent Insurance Platform</h3>
+      <span class="badge badge-purple">Nordstern: 6–10 Jahre</span>
+    </div>
+    <div class="arch-card-body">
+      <p>KI-first Architektur: jede Domäne besitzt eigene KI-Fähigkeiten, eine zentrale Orchestrierungsschicht koordiniert LLM-Agenten, und die dispDB wird zum aktiven Datennervensystem mit Echtzeit-Feedback-Loop zurück in die operativen Domänen.</p>
+
+      <div class="layer-grid">
+        <div class="layer-box">
+          <div class="label purple">AI-Orchestrierung</div>
+          <ul>
+            <li>Azure OpenAI — LLM-Agenten für Sachbearbeiter</li>
+            <li>RAG über interne Wissensbasis (Policen, AGBs)</li>
+            <li>Schadenserstbewertung automatisiert</li>
+            <li>Copilot für Sachbearbeiter (Auto-Summary)</li>
+            <li>Kundenservice-Bot mit Eskalationslogik</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label purple">Intelligente Domänen</div>
+          <ul>
+            <li>Policy + KI: Auto-Underwriting, Echtzeit-Tarifierung</li>
+            <li>Customer + KI: Churn-Prediction, LTV-Scoring</li>
+            <li>Claims + KI: Foto-Schadensbewertung, Fraud-Score</li>
+            <li>Finance + KI: Reservierung, Rückversicherungsopt.</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label teal">dispDB als aktives System</div>
+          <ul>
+            <li>Nicht nur Reporting — KI-Ergebnisse zurück in Domänen</li>
+            <li>Feature Store für ML-Modelle</li>
+            <li>Modell-Registry (MLflow) in Databricks</li>
+            <li>A/B-Testing von Tarifmodellen</li>
+            <li>Drift-Monitoring der Produktionsmodelle</li>
+          </ul>
+        </div>
+        <div class="layer-box">
+          <div class="label coral">Neue Produktformen</div>
+          <ul>
+            <li>Parametrisch: Wetter-Index-Trigger → Sofortauszahlung</li>
+            <li>Telematik / IoT: Smart Home, Kfz-Tracking</li>
+            <li>Usage-Based Insurance (UBI)</li>
+            <li>Embedded Insurance via Partner-API</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="layer-box" style="margin-top:0.75rem">
+        <div class="label coral">Compliance-Erweiterung: EU AI Act (ab 2025 verpflichtend)</div>
+        <ul style="column-count:2; column-gap:2rem;">
+          <li>Risikoklassifizierung aller KI-Modelle</li>
+          <li>Explainability-Pflicht für Tarifentscheidungen</li>
+          <li>Human-in-the-Loop für Hochrisiko-Entscheidungen</li>
+          <li>Model Risk Management Framework</li>
+          <li>Bias-Monitoring und Fairness-Tests</li>
+          <li>Dokumentationspflicht aller Trainingsdaten</li>
+        </ul>
+      </div>
+      <div class="verdict-box verdict-purple">Empfehlung: Architektur 3 als strategischer Nordstern formulieren. Einzelne KI-Komponenten (Schadens-Foto-Bewertung, Churn-Prediction) können bereits heute als Piloten in Architektur 1 eingebettet werden.</div>
+    </div>
+  </div>
+</section>
+
+<!-- COBRA CRM -->
+<section id="cobra">
+  <h2>Cobra CRM — führendes System für Maklerdaten</h2>
+  <p class="lead">Cobra ist das System of Record <em>ausschließlich für Maklerdaten</em> — nicht für Policen, Prämien oder sonstige Versicherungsdaten. AS/400 bleibt führend für Nicht-Leben, Oracle für Leben. Die Architektur muss diese drei Systems of Record klar abgrenzen und gleichzeitig ihre Daten über den gemeinsamen Event Bus verfügbar machen.</p>
+
+  <div class="highlight-box" style="margin-bottom:1.25rem">
+    <strong>Die drei Systems of Record:</strong><br>
+    AS/400 → Nicht-Leben (Policen NL, Bestand, Prämien, Schäden) &nbsp;|&nbsp;
+    Oracle / msg-Life → Leben (Policen L, Neugeschäft, Bestand L) &nbsp;|&nbsp;
+    Cobra CRM → Makler (Register, IHK-Status, Provision, Kontakt).<br>
+    Kein System schreibt in die Domäne eines anderen — ausschließlich über den autorisierten Kanal.
+  </div>
+
+  <h3>Ausgangssituation und Ziel</h3>
+  <p style="font-size:14px">Heute empfängt Cobra seine Daten per <strong>CSV-Export aus der AS/400</strong> — manuell, fehleranfällig, ohne Audit-Trail, mit mindestens 24h Verzug. Die AS/400 übernimmt dabei fälschlicherweise eine Verteilerfunktion, die ihr nicht zusteht. Das Ziel ist die Umkehrung: Cobra wird zum aktiven System für Maklerdaten — liest Policendaten über den API-Layer (statt CSV) und publiziert Makleränderungen als Events auf den Bus.</p>
+
+  <h3>Integrationsansatz: Cobra als Event-Produzent für Maklerdaten</h3>
+  <p>Die sauberste Lösung in allen drei Architekturvarianten ist dieselbe: Cobra wird über einen dedizierten Adapter an den Event Bus angeschlossen. Cobra schreibt in seine eigene Datenbank (bleibt Systemhoheit), publiziert aber jeden relevanten Geschäftsvorfall als Event.</p>
+
+  <div class="layer-grid">
+    <div class="layer-box">
+      <div class="label teal">Cobra-Events (Beispiele)</div>
+      <ul>
+        <li><code>partner.registered</code> — neuer Makler angelegt</li>
+        <li><code>partner.ihk_verified</code> — IHK-Prüfung bestanden</li>
+        <li><code>partner.status_changed</code> — Makler aktiv/inaktiv</li>
+        <li><code>partner.contact_updated</code> — Stammdatenänderung</li>
+        <li><code>partner.commission_rate_set</code> — Provisionssatz</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label blue">Konsumenten dieser Events</div>
+      <ul>
+        <li>Partner Domain Service — synchronisiert Maklerregister</li>
+        <li>X4/BiPRO — kennt aktuellen Maklerstatus</li>
+        <li>Kundenportal — zeigt Maklerinfos dem Kunden</li>
+        <li>dispDB Bronze — Makleranalysen, Vertriebsreporting</li>
+        <li>M/Text — adressiert Korrespondenz korrekt</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label amber">Schreibrechte (kritisch)</div>
+      <ul>
+        <li>Cobra bleibt einzige Schreibquelle für Maklerdaten</li>
+        <li>Kein Rückschreiben aus anderen Domänen → Cobra</li>
+        <li>Ausnahme: IHK-Prüfergebnis kann rückfließen</li>
+        <li>Adressprüfung (ABIS) löst Cobra-Update aus</li>
+        <li>Klare API-Grenze: nur Cobra-eigene Endpoints schreiben</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label coral">Ablösepfad (Phase 3)</div>
+      <ul>
+        <li>Cobra-Adapter abstrahiert die Cobra-Interna vollständig</li>
+        <li>Cobra kann durch modernes CRM ersetzt werden</li>
+        <li>Alle Konsumenten merken davon nichts</li>
+        <li>Event-Schema bleibt stabil (Strangler Fig)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>Empfehlung:</strong> Cobra REST API direkt an den Azure Service Bus anbinden via Azure Logic Apps oder Azure Function (Cobra-Webhook → Topic <code>partner.events</code>). Kein eigener Middleware-Service nötig — das spart einen Deployment-Schritt und nutzt vorhandene Azure-Komponenten.
+  </div>
+</section>
+
+<!-- EVOLUTIONSPFAD -->
+<section id="evolution">
+  <h2>Evolutionspfad: Von heute in die Zukunft</h2>
+  <p class="lead">Nicht Architektur 1 oder 2 oder 3 — sondern 1 dann 2 dann 3. Jede Phase baut auf der vorherigen auf, kein Big Bang, kein Systemstillstand.</p>
+
+  <div class="roadmap">
+    <div class="rm-item">
+      <div class="rm-dot teal"></div>
+      <div class="rm-phase">Phase 0 · Jetzt · 2025/2026</div>
+      <div class="rm-title">Fundament: dispDB + API-Adapter</div>
+      <div class="rm-body">dispDB (MS Fabric + Databricks) aufbauen. SHIR/Data Factory für AS/400-Ingestion. Oracle-Connectivity herstellen. Erstes Power BI Dashboard für Vorstand. APIM aufsetzen als Gateway. AS/400- und Oracle-Adapter als Azure Functions implementieren. Cobra-Webhook an Service Bus anschließen.</div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot teal"></div>
+      <div class="rm-phase">Phase 1 · 2026–2028</div>
+      <div class="rm-title">Composable Insurance (Architektur 1)</div>
+      <div class="rm-body">Domain-Services schneiden und deployen (Policy, Customer, Claims, Partner). Azure Service Bus als zentralen Event Bus einführen. Kundenportal auf APIM-Layer aufschalten — liest/schreibt nur über API, nie direkt auf Legacy. Sachbearbeiter-Frontend ablösen. Extranet in Portal integrieren. Alle externen Dienste (IHK, ABIS, ZürsGeo) als Event-Produzenten anbinden.</div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot blue"></div>
+      <div class="rm-phase">Phase 2 · 2028–2031</div>
+      <div class="rm-title">Event-Sourced Architecture (Architektur 2)</div>
+      <div class="rm-body">Service Bus durch Apache Kafka / Azure Event Hubs ersetzen oder ergänzen. CQRS einführen: Read Models als PostgreSQL-Projektionen. dispDB liest direkt aus Kafka-Topics. Echtzeit-Fraud-Detection via Stream Analytics. CDC aus AS/400 (Journal) und Oracle (LogMiner) — Batch-Ingest entfällt. Blockchain-Pilot für GDV-Schadenspool.</div>
+    </div>
+    <div class="rm-item">
+      <div class="rm-dot purple"></div>
+      <div class="rm-phase">Phase 3 · 2031+</div>
+      <div class="rm-title">Intelligent Insurance Platform (Architektur 3)</div>
+      <div class="rm-body">KI-Orchestrierungsschicht über Azure OpenAI. Auto-Underwriting in Policy Domain. Churn-Prediction und LTV-Scoring in Customer Domain. Foto-Schadensabwicklung in Claims Domain. dispDB als aktiver Feature Store: Modell-Ergebnisse fließen zurück in Domain-Services. Parametrische Produkte via Smart Contracts. Cobra-Ablösung durch modernes KI-fähiges CRM.</div>
+    </div>
+  </div>
+</section>
+
+<!-- SKALIERBARKEIT -->
+<section id="skalierbarkeit">
+  <h2>Skalierbarkeit: Das Versprechen nicht zu wiederholen</h2>
+  <p class="lead">Die beschriebenen Architekturen sind so konzipiert, dass kein Element zum Flaschenhals wird — weder technisch noch organisatorisch.</p>
+
+  <h3>Vergleich der Varianten nach Erweiterbarkeit</h3>
+  <table class="decision-table">
+    <thead>
+      <tr>
+        <th>Kriterium</th>
+        <th>Heute (Legacy)</th>
+        <th>Architektur 1</th>
+        <th>Architektur 2</th>
+        <th>Architektur 3</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Neues Produkt einführen</td>
+        <td class="no">Monate, AS/400-Eingriff</td>
+        <td class="mid">Neuer Domain-Service</td>
+        <td class="ok">Neues Kafka-Topic</td>
+        <td class="ok">KI-Modell + Topic</td>
+      </tr>
+      <tr>
+        <td>Neuer Vertriebskanal</td>
+        <td class="no">Hardcoded Integration</td>
+        <td class="mid">APIM-Policy + Adapter</td>
+        <td class="ok">Event-Consumer</td>
+        <td class="ok">Agent + Consumer</td>
+      </tr>
+      <tr>
+        <td>Kernsystem ablösen</td>
+        <td class="no">Big Bang</td>
+        <td class="mid">Strangler Fig via Adapter</td>
+        <td class="ok">Kafka entkoppelt vollständig</td>
+        <td class="ok">Kafka + KI-Modell-Swap</td>
+      </tr>
+      <tr>
+        <td>Regulierung (DORA, BaFin)</td>
+        <td class="no">Manueller Nachweis</td>
+        <td class="mid">Service Bus = Audit-Log</td>
+        <td class="ok">Kafka = unveränderl. Log</td>
+        <td class="ok">+ KI-Entscheidungslog</td>
+      </tr>
+      <tr>
+        <td>Lastspitzen (z. B. Sturm)</td>
+        <td class="no">AS/400-Kapazitätsgrenze</td>
+        <td class="mid">Domain-Service skaliert</td>
+        <td class="ok">Kafka-Consumer horizontal</td>
+        <td class="ok">Auto-Scaling + KI-Triage</td>
+      </tr>
+      <tr>
+        <td>Neues KI-Modell einbinden</td>
+        <td class="no">Nicht vorgesehen</td>
+        <td class="mid">Service in Domain integrieren</td>
+        <td class="ok">Stream-Processor ergänzen</td>
+        <td class="ok">Nativ, Feature Store vorhanden</td>
+      </tr>
+      <tr>
+        <td>Team-Autonomie</td>
+        <td class="no">Alles zentral abhängig</td>
+        <td class="mid">Je Domain-Team eigenständig</td>
+        <td class="ok">Topic-Ownership je Team</td>
+        <td class="ok">Full-Stack Domain-Teams</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Die drei Prinzipien, die echte Skalierbarkeit sichern</h3>
+  <div class="layer-grid">
+    <div class="layer-box">
+      <div class="label teal">1. Lose Kopplung über Events</div>
+      <ul>
+        <li>Kein System kennt das Innenleben eines anderen</li>
+        <li>Kommunikation nur über definierte Event-Schemas</li>
+        <li>Schema Registry verhindert Breaking Changes</li>
+        <li>Backward-Compatibility erzwungen</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label blue">2. Anti-Corruption Layer</div>
+      <ul>
+        <li>Jedes Legacy-System hat genau einen Adapter</li>
+        <li>Der Adapter übersetzt, die Domäne ignoriert Legacy-Logik</li>
+        <li>Legacy kann ausgetauscht werden ohne Domänen-Eingriff</li>
+        <li>Gilt auch für Cobra, M/Text, X4</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label purple">3. Analytik strikt getrennt</div>
+      <ul>
+        <li>dispDB hat keinen Schreibpfad ins operative System</li>
+        <li>Analytische Lasten beeinflussen nicht das Portal</li>
+        <li>Gold-Layer kann jederzeit neu aufgebaut werden</li>
+        <li>KI-Modelle liegen in der Analytikschicht — safe to fail</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label amber">Organisatorisch: Conway's Law</div>
+      <ul>
+        <li>Team-Struktur spiegelt Domänen-Schnitt wider</li>
+        <li>Business Transformation = Architektur-Governance</li>
+        <li>Kein Team darf direkt in eine fremde Domain schreiben</li>
+        <li>API-Design als Produkt, nicht als Integrationsaufwand</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <strong>Kernbotschaft für den Workshop:</strong> Die heutige Architektur ist nicht skalierbar, weil sie punkt-zu-punkt verdrahtet ist — jede neue Anforderung erfordert einen neuen direkten Eingriff. Die neue Architektur ist skalierbar, weil jede neue Anforderung nur einen neuen Event-Consumer braucht, ohne bestehende Systeme zu berühren. Das ist der fundamentale Paradigmenwechsel.
+  </div>
+</section>
+
+<!-- SYSTEM OF RECORD -->
+<section id="sor">
+  <h2>System-of-Record-Modell</h2>
+  <p class="lead">Drei Systems of Record — klar abgegrenzt nach fachlicher Domäne. Kein System übernimmt Verantwortung außerhalb seiner Kompetenz. Diese Aufteilung ist das Fundament aller drei Architekturvarianten.</p>
+
+  <div style="background:var(--c-bg2);border-radius:var(--radius);padding:1rem;overflow-x:auto;margin:1rem 0">
+    <svg viewBox="0 0 860 300" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;height:auto">
+      <defs><marker id="sarr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <!-- AS/400 -->
+      <rect x="10" y="20" width="240" height="100" rx="10" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1"/>
+      <text x="130" y="48" text-anchor="middle" font-size="13" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">AS/400</text>
+      <text x="130" y="66" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">führend: Nicht-Leben</text>
+      <text x="130" y="82" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">Policen NL · Prämien · Schäden</text>
+      <rect x="18" y="104" width="224" height="20" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="130" y="117" text-anchor="middle" font-size="10" fill="#085041" font-family="system-ui,sans-serif">System of Record: Nicht-Leben</text>
+      <!-- Oracle -->
+      <rect x="310" y="20" width="240" height="100" rx="10" fill="#F1EFE8" stroke="#B4B2A9" stroke-width="1"/>
+      <text x="430" y="48" text-anchor="middle" font-size="13" font-weight="600" fill="#2C2C2A" font-family="system-ui,sans-serif">Oracle 11g / msg-Life</text>
+      <text x="430" y="66" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">führend: Leben</text>
+      <text x="430" y="82" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif">Policen L · Neugeschäft · Bestand</text>
+      <rect x="318" y="104" width="224" height="20" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="430" y="117" text-anchor="middle" font-size="10" fill="#085041" font-family="system-ui,sans-serif">System of Record: Leben</text>
+      <!-- Cobra -->
+      <rect x="610" y="20" width="240" height="100" rx="10" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="1"/>
+      <text x="730" y="48" text-anchor="middle" font-size="13" font-weight="600" fill="#26215C" font-family="system-ui,sans-serif">Cobra CRM</text>
+      <text x="730" y="66" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">führend: Maklerdaten only</text>
+      <text x="730" y="82" text-anchor="middle" font-size="11" fill="#534AB7" font-family="system-ui,sans-serif">Maklerregister · IHK · Provision</text>
+      <rect x="618" y="104" width="224" height="20" rx="4" fill="#EEEDFE" stroke="#AFA9EC" stroke-width="0.5"/>
+      <text x="730" y="117" text-anchor="middle" font-size="10" fill="#3C3489" font-family="system-ui,sans-serif">System of Record: Makler</text>
+      <!-- NOT responsible -->
+      <text x="130" y="148" text-anchor="middle" font-size="10" fill="#888780" font-family="system-ui,sans-serif">nicht verantwortlich für:</text>
+      <text x="130" y="162" text-anchor="middle" font-size="10" fill="#E24B4A" font-family="system-ui,sans-serif">Leben · Maklerdaten</text>
+      <text x="430" y="148" text-anchor="middle" font-size="10" fill="#888780" font-family="system-ui,sans-serif">nicht verantwortlich für:</text>
+      <text x="430" y="162" text-anchor="middle" font-size="10" fill="#E24B4A" font-family="system-ui,sans-serif">Nicht-Leben · Maklerdaten</text>
+      <text x="730" y="148" text-anchor="middle" font-size="10" fill="#888780" font-family="system-ui,sans-serif">nicht verantwortlich für:</text>
+      <text x="730" y="162" text-anchor="middle" font-size="10" fill="#E24B4A" font-family="system-ui,sans-serif">Policen · Prämien · Schäden</text>
+      <!-- Arrows to Bus -->
+      <line x1="130" y1="170" x2="220" y2="212" stroke="#888780" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <line x1="430" y1="170" x2="430" y2="212" stroke="#888780" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <line x1="730" y1="170" x2="640" y2="212" stroke="#7F77DD" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <!-- Bus -->
+      <rect x="10" y="212" width="840" height="52" rx="8" fill="#FAEEDA" stroke="#EF9F27" stroke-width="1"/>
+      <text x="430" y="233" text-anchor="middle" font-size="13" font-weight="600" fill="#633806" font-family="system-ui,sans-serif">Azure Service Bus / Kafka — gemeinsamer Event Bus</text>
+      <text x="430" y="252" text-anchor="middle" font-size="11" fill="#854F0B" font-family="system-ui,sans-serif">policy.nl.events (AS/400) · policy.l.events (Oracle) · partner.events (Cobra) · kein CSV mehr</text>
+      <!-- Consumers -->
+      <line x1="220" y1="264" x2="130" y2="284" stroke="#BA7517" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <line x1="350" y1="264" x2="315" y2="284" stroke="#BA7517" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <line x1="500" y1="264" x2="545" y2="284" stroke="#BA7517" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <line x1="640" y1="264" x2="700" y2="284" stroke="#BA7517" stroke-width="0.8" marker-end="url(#sarr)"/>
+      <rect x="10" y="284" width="220" height="10" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="120" y="292" text-anchor="middle" font-size="9" fill="#085041" font-family="system-ui,sans-serif">dispDB (Bronze ← alle 3 Quellen)</text>
+      <rect x="240" y="284" width="150" height="10" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="315" y="292" text-anchor="middle" font-size="9" fill="#085041" font-family="system-ui,sans-serif">Kundenportal (APIM)</text>
+      <rect x="400" y="284" width="210" height="10" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="505" y="292" text-anchor="middle" font-size="9" fill="#085041" font-family="system-ui,sans-serif">X4 / BiPRO (Makler + Policen)</text>
+      <rect x="620" y="284" width="230" height="10" rx="4" fill="#E1F5EE" stroke="#5DCAA5" stroke-width="0.5"/>
+      <text x="735" y="292" text-anchor="middle" font-size="9" fill="#085041" font-family="system-ui,sans-serif">M/Text (Druckaufträge via Event)</text>
+    </svg>
+  </div>
+
+  <div class="highlight-box">
+    <strong>Die Umkehrung der AS/400-Abhängigkeit:</strong> Heute exportiert die AS/400 täglich CSV-Dateien an Cobra. Morgen empfängt die AS/400 ihre Aufträge über den API-Layer und publiziert Zustandsänderungen als Events. Cobra liest Policendaten über die Policy NL/L API und publiziert Makleränderungen als <code>partner.events</code>. Der Anti-Corruption-Adapter kapselt alle AS/400-Eigenheiten — das Legacy-System kann dahinter ausgetauscht werden, ohne das Portal oder andere Domänen zu berühren.
+  </div>
+</section>
+
+<!-- DEVELOPER EXPERIENCE -->
+<section id="dx">
+  <h2>Developer Experience und internes API-Portal</h2>
+  <p class="lead">Developer Experience (DX) beschreibt, wie einfach interne Teams neue Funktionen auf Basis vorhandener Systemfähigkeiten bauen können — ohne Ticket, ohne CSV-Koordination, ohne AS/400-Eingriff.</p>
+
+  <h3>Heute vs. Ziel</h3>
+  <div class="layer-grid">
+    <div class="layer-box" style="border-left:3px solid var(--c-coral)">
+      <div class="label coral">Heute — ohne API-Portal</div>
+      <ul>
+        <li>Kein Team weiß, was andere Teams anbieten</li>
+        <li>Jede Integration ist ein Sonderprojekt mit Ticket</li>
+        <li>AS/400-Wissen = Flaschenhals (Kopfmonopol)</li>
+        <li>CSV-Dateien als "API" — keine Versionierung</li>
+        <li>Cobra-Maklerstand: mind. 24h veraltet</li>
+        <li>Kein Audit-Trail, wer was wann abgefragt hat</li>
+      </ul>
+    </div>
+    <div class="layer-box" style="border-left:3px solid var(--c-teal)">
+      <div class="label teal">Ziel — Azure APIM Developer Portal</div>
+      <ul>
+        <li>Katalog aller internen APIs, durchsuchbar, mit Swagger-Doku</li>
+        <li>Self-Service: API-Key in Minuten, kein Ticket nötig</li>
+        <li>Sandbox-Umgebung zum Testen vorhanden</li>
+        <li>Versionierung: v1 und v2 parallel betreibbar</li>
+        <li>Rate Limits, Auth, Logging zentral konfiguriert</li>
+        <li>APIM loggt jeden Aufruf: vollständiger Audit-Trail</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Interne APIs (Beispielkatalog)</h3>
+  <table class="decision-table">
+    <thead><tr><th>API</th><th>Endpoints (Auszug)</th><th>Konsumenten</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Policy NL API</strong> (AS/400-Adapter)</td><td>GET /policy/{nr} · GET /policy/bestand · POST /policy/address-change</td><td>Kundenportal, Sachbearb.-FE, dispDB, BiPRO</td></tr>
+      <tr><td><strong>Policy L API</strong> (Oracle-Adapter)</td><td>GET /life/{nr} · GET /life/neugeschaeft · POST /life/update</td><td>Kundenportal, Sachbearb.-FE, dispDB</td></tr>
+      <tr><td><strong>Partner API</strong> (Cobra-Adapter)</td><td>GET /partner/{id} · GET /partner/search · POST /partner/register · PATCH /partner/{id}/status</td><td>BiPRO/X4, Kundenportal, dispDB</td></tr>
+      <tr><td><strong>Claims API</strong></td><td>POST /claim/file · GET /claim/{id}/status · PATCH /claim/{id}/settle</td><td>Kundenportal, Sachbearb.-FE, dispDB</td></tr>
+      <tr><td><strong>Address Check API</strong> (ABIS)</td><td>POST /address/validate · GET /address/normalize</td><td>Kundenportal, Partner Domain, Policy-Domains</td></tr>
+      <tr><td><strong>Geo Risk API</strong> (ZürsGeo)</td><td>GET /georisk/zone?plz={plz} · GET /georisk/flood-zone</td><td>Policy NL Domain (Tarifierung), dispDB</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- DATA MESH -->
+<section id="datamesh">
+  <h2>Data-Mesh-Philosophie und dispDB</h2>
+  <p class="lead">Data Mesh überträgt die Eigenverantwortung für Datenqualität an die fachlichen Domänenteams — statt alles in einem zentralen Data Warehouse zu bündeln. Die dispDB wird zur Selbstbedienungsplattform, nicht zur Dateneingabestelle.</p>
+
+  <h3>Die vier Prinzipien — konkret</h3>
+  <div class="layer-grid">
+    <div class="layer-box">
+      <div class="label teal">1. Domänen-Eigenverantwortung</div>
+      <ul>
+        <li>Policy-Team besitzt Datenprodukt "Policenbestand NL"</li>
+        <li>Partner-Team besitzt Datenprodukt "Maklerregister" (aus Cobra)</li>
+        <li>Wenn Policendaten falsch sind: Policy-Team ist verantwortlich — nicht das Data-Team</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label blue">2. Daten als Produkt</div>
+      <ul>
+        <li>Definiertes Schema, stabil, backward-compatible</li>
+        <li>SLA: "täglich bis 06:00 Uhr, max. 4h Verzug"</li>
+        <li>Ansprechpartner (Data Product Owner) im Fachteam</li>
+        <li>Dokumentation im Purview-Katalog: Schema, Herkunft, Sensitivität</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label purple">3. Self-Service-Plattform</div>
+      <ul>
+        <li>dispDB stellt Delta Lake, Unity Catalog, Purview bereit</li>
+        <li>Domänenteams legen Datenprodukte selbst ein — kein Ticket ans Data-Team</li>
+        <li>Business Transformation gibt Framework vor — nicht Inhalte</li>
+      </ul>
+    </div>
+    <div class="layer-box">
+      <div class="label amber">4. Föderierte Governance</div>
+      <ul>
+        <li>Globale Regeln (DSGVO, BaFin, Naming) von Business Transformation</li>
+        <li>Lokale Strukturentscheidungen beim Domänenteam</li>
+        <li>Zentrales "Was" — dezentrales "Wie"</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Konkrete Datenprodukte</h3>
+  <table class="decision-table">
+    <thead><tr><th>Datenprodukt</th><th>Eigentümer</th><th>SLA</th><th>Gold-Tabelle</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Versicherungsbestand NL</strong></td><td>Policy-Team (AS/400)</td><td>tägl. bis 06:00</td><td>gold.policy.nl_bestand</td></tr>
+      <tr><td><strong>Versicherungsbestand L</strong></td><td>Policy-Team (Oracle)</td><td>tägl. bis 06:00</td><td>gold.policy.l_bestand</td></tr>
+      <tr><td><strong>Maklerregister</strong></td><td>Partner-Team (Cobra)</td><td>Echtzeit via Event</td><td>gold.partner.makler</td></tr>
+      <tr><td><strong>Schadensereignisse</strong></td><td>Claims-Team</td><td>Echtzeit via Event</td><td>gold.claims.ereignisse</td></tr>
+      <tr><td><strong>Externe Referenzdaten</strong></td><td>dispDB-Team (Integrator)</td><td>wöchentl. / on-demand</td><td>gold.ext.*</td></tr>
+    </tbody>
+  </table>
+
+  <div class="verdict-box verdict-green">
+    <strong>Strategische Repositionierung der dispDB:</strong> Nicht als zentrales Datenlager, das alles einsaugt und für alle Datenqualitätsprobleme verantwortlich ist — sondern als Selbstbedienungsplattform mit klaren Spielregeln. Business Transformation definiert die Governance-Regeln der Datenlandschaft und liefert den kuratierten Gold-Layer für den Vorstand. Das ist eine strategisch stärkere Position ohne den Flaschenhals-Effekt.
+  </div>
+</section>
+
+</div><!-- /main -->
+
+<footer>
+  <span>Erstellt zur Vorbereitung des Business-Transformation-Workshops · Juni 2026</span>
+  <span>dispDB-Projekt · Interne Verwendung</span>
+</footer>
+
+</body>
+</html>
