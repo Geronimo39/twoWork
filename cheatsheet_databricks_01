@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kapitel 1 · Workspace, Cluster & Notebooks | dispDB Databricks Kurs</title>
+<style>
+  :root {
+    --purple:       #534AB7;
+    --purple-light: #EEEDFE;
+    --purple-dark:  #3C3489;
+    --teal:         #0F6E56;
+    --teal-light:   #E1F5EE;
+    --teal-dark:    #085041;
+    --amber:        #BA7517;
+    --amber-light:  #FAEEDA;
+    --amber-dark:   #633806;
+    --coral:        #993C1D;
+    --coral-light:  #FAECE7;
+    --coral-dark:   #712B13;
+    --gray:         #5F5E5A;
+    --gray-light:   #F1EFE8;
+    --gray-dark:    #2C2C2A;
+    --code-bg:      #F8F7F4;
+    --code-fg:      #185FA5;
+    --code-kw:      #3B6D11;
+    --code-str:     #993C1D;
+    --code-cmt:     #888780;
+    --border:       #D3D1C7;
+    --text:         #2C2C2A;
+    --text-sec:     #5F5E5A;
+    --bg:           #FFFFFF;
+    --bg-sec:       #F8F7F4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --purple:       #AFA9EC;
+      --purple-light: #26215C;
+      --purple-dark:  #CECBF6;
+      --teal:         #5DCAA5;
+      --teal-light:   #04342C;
+      --teal-dark:    #9FE1CB;
+      --amber:        #EF9F27;
+      --amber-light:  #412402;
+      --amber-dark:   #FAC775;
+      --coral:        #F0997B;
+      --coral-light:  #4A1B0C;
+      --coral-dark:   #F5C4B3;
+      --gray:         #B4B2A9;
+      --gray-light:   #2C2C2A;
+      --gray-dark:    #D3D1C7;
+      --code-bg:      #1E1E1C;
+      --code-fg:      #85B7EB;
+      --code-kw:      #97C459;
+      --code-str:     #F0997B;
+      --code-cmt:     #888780;
+      --border:       #444441;
+      --text:         #E8E6DF;
+      --text-sec:     #B4B2A9;
+      --bg:           #1A1A18;
+      --bg-sec:       #242422;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text);
+    background: var(--bg);
+    padding: 16px;
+  }
+  /* Header */
+  .page-header {
+    text-align: center;
+    padding: 14px 0 12px;
+    border-bottom: 2px solid var(--purple);
+    margin-bottom: 16px;
+  }
+  .page-header h1 { font-size: 18px; color: var(--purple); font-weight: 700; }
+  .page-header h2 { font-size: 14px; font-weight: 500; color: var(--text); margin-top: 2px; }
+  .page-header p  { font-size: 11px; color: var(--text-sec); margin-top: 3px; }
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+  /* Cards */
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .card-header {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .card-header.purple { background: var(--purple-dark, var(--purple)); }
+  .card-header.teal   { background: var(--teal); }
+  .card-header.coral  { background: var(--coral); }
+  .card-body { padding: 10px 12px; }
+  /* Section boxes */
+  .box {
+    border-left: 3px solid;
+    border-radius: 0 6px 6px 0;
+    padding: 7px 10px;
+    margin: 6px 0;
+    font-size: 12px;
+  }
+  .box.purple { border-color: var(--purple); background: var(--purple-light); color: var(--purple-dark); }
+  .box.teal   { border-color: var(--teal);   background: var(--teal-light);   color: var(--teal-dark); }
+  .box.amber  { border-color: var(--amber);  background: var(--amber-light);  color: var(--amber-dark); }
+  .box.coral  { border-color: var(--coral);  background: var(--coral-light);  color: var(--coral-dark); }
+  .box.gray   { border-color: var(--gray);   background: var(--gray-light);   color: var(--gray-dark); }
+  .box strong { font-weight: 600; }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 6px 0; }
+  th { background: var(--bg-sec); color: var(--text-sec); font-weight: 600;
+       padding: 4px 6px; border-bottom: 1.5px solid var(--border); text-align: left; }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .yes { color: var(--teal); font-weight: 600; }
+  .no  { color: var(--coral); }
+  /* Code */
+  code, .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+                font-size: 11.5px; }
+  .ic { color: var(--code-fg); font-family: "SFMono-Regular", Consolas, monospace; font-size: 11.5px; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    overflow-x: auto;
+    margin: 5px 0;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .kw  { color: var(--code-kw); font-weight: 600; }
+  .str { color: var(--code-str); }
+  .cmt { color: var(--code-cmt); font-style: italic; }
+  .fn  { color: var(--code-fg); }
+  /* Lists */
+  ul, dl { padding-left: 16px; margin: 4px 0; }
+  li, dd  { margin-bottom: 2px; font-size: 12px; }
+  dt { font-weight: 600; color: var(--code-fg); font-family: monospace; font-size: 11.5px; }
+  dd { margin-left: 8px; margin-bottom: 4px; padding-left: 0; }
+  dl { padding-left: 0; }
+  /* Sub-labels */
+  .label {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 1px 7px; border-radius: 10px; margin-bottom: 4px;
+  }
+  .label.teal   { background: var(--teal-light);  color: var(--teal-dark); }
+  .label.amber  { background: var(--amber-light); color: var(--amber-dark); }
+  .label.coral  { background: var(--coral-light); color: var(--coral-dark); }
+  /* Footer */
+  .page-footer {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-sec);
+    display: flex;
+    justify-content: space-between;
+  }
+  h3 { font-size: 12px; font-weight: 600; color: var(--text); margin: 6px 0 3px; }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Databricks Kurs — Kapitel 1</h1>
+  <h2>Workspace, Cluster &amp; Notebooks</h2>
+  <p>dispDB · Azure Databricks · Stand: Juni 2025</p>
+</div>
+
+<div class="grid">
+
+  <!-- ── 1. WORKSPACE-BEREICHE ── -->
+  <div class="card">
+    <div class="card-header purple">1 · Workspace-Bereiche</div>
+    <div class="card-body">
+      <dl>
+        <dt>Notebooks / Repos</dt><dd>Dateien, Notebooks, Git-Integration (CI/CD-fähig)</dd>
+        <dt>Compute</dt><dd>Cluster, SQL Warehouses, Instance Pools</dd>
+        <dt>Data &amp; Catalog</dt><dd>Unity Catalog, Metastore, Tabellen, Volumes</dd>
+        <dt>Workflows</dt><dd>Job-Scheduling, Multi-Task-Pipelines, DLT</dd>
+        <dt>SQL Editor</dt><dd>Interaktive SQL-Abfragen, Dashboards</dd>
+        <dt>ML / Experiments</dt><dd>MLflow, Feature Store, AutoML</dd>
+        <dt>Admin Console</dt><dd>User, Gruppen, Workspace-Einstellungen</dd>
+      </dl>
+      <div class="box gray" style="margin-top:8px">
+        <strong>URL-Schema (Azure):</strong><br>
+        <span class="ic">https://adb-&lt;id&gt;.azuredatabricks.net</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. CLUSTER-TYPEN ── -->
+  <div class="card">
+    <div class="card-header purple">2 · Cluster-Typen im Vergleich</div>
+    <div class="card-body">
+      <table>
+        <tr><th></th><th>All-Purpose</th><th>Job</th><th>SQL WH</th></tr>
+        <tr><td>Lebensdauer</td><td>Dauerhaft</td><td>Job-Laufzeit</td><td>Auto-Stop</td></tr>
+        <tr><td>Sprachen</td><td>Alle</td><td>Alle</td><td>Nur SQL</td></tr>
+        <tr><td>Notebooks</td><td class="yes">Ja</td><td class="no">Nein</td><td class="no">Nein</td></tr>
+        <tr><td>Kosten</td><td class="no">Hoch</td><td class="yes">Niedrig</td><td class="yes">Niedrig</td></tr>
+        <tr><td>Multi-User</td><td class="yes">Ja</td><td class="no">Nein</td><td class="yes">Ja</td></tr>
+        <tr><td>Power BI DL</td><td class="no">Nein</td><td class="no">Nein</td><td class="yes">Ja</td></tr>
+        <tr><td>Auto-Scale</td><td class="yes">Ja</td><td class="yes">Ja</td><td class="yes">Ja</td></tr>
+      </table>
+      <div class="box teal" style="margin-top:8px">
+        <strong>dispDB-Empfehlung:</strong>
+        <ul style="margin-top:3px">
+          <li>Entwicklung: All-Purpose + Auto-Termination 30 min</li>
+          <li>ETL-Produktion: Job Cluster</li>
+          <li>Power BI DirectLake: SQL Warehouse</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 3. DATABRICKS RUNTIME ── -->
+  <div class="card">
+    <div class="card-header purple">3 · Databricks Runtime (DBR)</div>
+    <div class="card-body">
+      <table>
+        <tr><th>Runtime</th><th>Inhalt / Einsatz</th></tr>
+        <tr><td><span class="ic">x.y</span></td><td>Spark, Python, Delta Lake, Grundpakete</td></tr>
+        <tr><td><span class="ic">x.y ML</span></td><td>+ MLflow, TensorFlow, PyTorch, sklearn</td></tr>
+        <tr><td><span class="ic">x.y Photon</span></td><td>+ Photon Engine (C++, SQL-Speedup)</td></tr>
+        <tr><td><span class="ic">x.y LTS</span></td><td>Long Term Support — <strong>Empfehlung Produktion</strong></td></tr>
+      </table>
+      <div class="box amber" style="margin-top:8px">
+        <strong>dispDB:</strong> Aktuelle LTS, Standard oder Photon.<br>
+        ML-Runtime in Phase I nicht benötigt.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. MAGIC COMMANDS ── -->
+  <div class="card">
+    <div class="card-header purple">4 · Magic Commands (Notebook-Zellen)</div>
+    <div class="card-body">
+      <table>
+        <tr><th>Befehl</th><th>Wirkung</th></tr>
+        <tr><td><span class="ic">%python</span></td><td>Python — Standard, meist weglassbar</td></tr>
+        <tr><td><span class="ic">%sql</span></td><td>Spark SQL, Ergebnis als interaktive Tabelle</td></tr>
+        <tr><td><span class="ic">%scala</span></td><td>Scala-Zelle (SparkContext vorverdrahtet)</td></tr>
+        <tr><td><span class="ic">%sh</span></td><td>Shell auf Driver-Node (nicht Worker!)</td></tr>
+        <tr><td><span class="ic">%md</span></td><td>Markdown-Dokumentationszelle</td></tr>
+        <tr><td><span class="ic">%run</span></td><td>Anderes Notebook einbinden (teilt Session)</td></tr>
+        <tr><td><span class="ic">%fs</span></td><td>DBFS navigieren: <span class="ic">%fs ls /mnt/bronze/</span></td></tr>
+        <tr><td><span class="ic">%pip</span></td><td>Python-Paket installieren (nur Session!)</td></tr>
+      </table>
+      <div class="box purple" style="margin-top:8px">
+        <strong>%run:</strong> Teilt Namensraum — Variablen aus dem aufgerufenen Notebook danach verfügbar. Besser als <span class="ic">import</span> für Utility-Notebooks.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 5. DBUTILS ── -->
+  <div class="card">
+    <div class="card-header purple">5 · dbutils — Wichtigste Befehle</div>
+    <div class="card-body">
+      <h3><span class="label teal">dbutils.fs</span></h3>
+      <pre><span class="fn">dbutils</span>.fs.ls(<span class="str">"/mnt/bronze/"</span>)
+<span class="fn">dbutils</span>.fs.mkdirs(<span class="str">"/mnt/silver/as400/"</span>)
+<span class="fn">dbutils</span>.fs.cp(<span class="str">"/mnt/bronze/f.csv"</span>,
+              <span class="str">"/mnt/silver/f.csv"</span>)
+<span class="fn">dbutils</span>.fs.rm(<span class="str">"/mnt/tmp/"</span>, recurse=<span class="kw">True</span>)</pre>
+
+      <h3><span class="label teal">dbutils.secrets</span></h3>
+      <pre><span class="cmt"># Kein Klartext-Passwort im Notebook!</span>
+pw = <span class="fn">dbutils</span>.secrets.get(
+    scope=<span class="str">"dispdb-kv"</span>,
+    key=<span class="str">"oracle-password"</span>)</pre>
+
+      <h3><span class="label teal">dbutils.widgets</span></h3>
+      <pre><span class="fn">dbutils</span>.widgets.text(
+    <span class="str">"run_date"</span>, <span class="str">"2024-01-01"</span>, <span class="str">"Stichtag"</span>)
+stichtag = <span class="fn">dbutils</span>.widgets.get(<span class="str">"run_date"</span>)</pre>
+
+      <h3><span class="label teal">dbutils.notebook</span></h3>
+      <pre>result = <span class="fn">dbutils</span>.notebook.run(
+    <span class="str">"./silver/as400_bestand"</span>,
+    timeout_seconds=<span class="str">600</span>,
+    arguments={<span class="str">"run_date"</span>: stichtag})</pre>
+    </div>
+  </div>
+
+  <!-- ── 6. CLUSTER-KONFIGURATION ── -->
+  <div class="card">
+    <div class="card-header purple">6 · Cluster-Konfiguration (Auswahl)</div>
+    <div class="card-body">
+      <table>
+        <tr><th>Parameter</th><th>Bedeutung / Empfehlung</th></tr>
+        <tr><td>Auto Termination</td><td>Idle-Timeout in Minuten (30 empfohlen)</td></tr>
+        <tr><td>Min/Max Workers</td><td>Grenzen für Auto-Scaling</td></tr>
+        <tr><td>Spark Config</td><td>Cluster-weite Spark-Properties</td></tr>
+        <tr><td>Env Variables</td><td>z.B. <span class="ic">TNS_ADMIN</span> für Oracle</td></tr>
+        <tr><td>Init Scripts</td><td>DBFS-Skript bei Cluster-Start ausführen</td></tr>
+        <tr><td>Libraries</td><td>JAR, Wheel oder PyPI — bei Start laden</td></tr>
+        <tr><td>Instance Pool</td><td>Vorgehaltene VMs — schnellerer Start</td></tr>
+        <tr><td>Access Mode</td><td>Single User / Shared / No Isolation</td></tr>
+      </table>
+      <div class="box coral" style="margin-top:8px">
+        <strong>Access Mode &amp; Unity Catalog:</strong><br>
+        UC erfordert <strong>Single User</strong> oder <strong>Shared</strong> Mode.<br>
+        <em>No Isolation Shared</em> = UC-inkompatibel — vermeiden!
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 7. ERSTE SCHRITTE ── -->
+  <div class="card">
+    <div class="card-header purple">7 · Erste Schritte im Notebook</div>
+    <div class="card-body">
+      <pre><span class="cmt"># SparkSession immer verfügbar (kein Import)</span>
+spark.version
+spark.catalog.listDatabases()
+
+<span class="cmt"># DBFS-Inhalt prüfen</span>
+<span class="fn">dbutils</span>.fs.ls(<span class="str">"/mnt/"</span>)
+
+<span class="cmt"># Delta-Tabelle lesen (Pfad)</span>
+df = spark.read.format(<span class="str">"delta"</span>) \
+    .load(<span class="str">"/mnt/bronze/as400/bestand"</span>)
+df.printSchema()
+df.show(<span class="str">5</span>, truncate=<span class="kw">False</span>)
+
+<span class="cmt"># Unity Catalog: 3-Ebenen-Namespace</span>
+df2 = spark.table(
+    <span class="str">"dispdb.bronze.as400_bestand"</span>)</pre>
+    </div>
+  </div>
+
+  <!-- ── 8. DISPDB-KONTEXT ── -->
+  <div class="card">
+    <div class="card-header teal">8 · dispDB — Bezug</div>
+    <div class="card-body">
+      <div class="box teal">
+        <strong>Cluster-Strategie dispDB:</strong>
+        <ul style="margin-top:4px">
+          <li><strong>Dev-Cluster</strong> (All-Purpose): Notebook-Entwicklung, Exploration AS/400 &amp; Oracle</li>
+          <li><strong>ETL-Job-Cluster</strong> (Job): Bronze→Silver→Gold, täglich scheduled</li>
+          <li><strong>SQL Warehouse</strong>: Gold-Layer → Power BI DirectLake</li>
+        </ul>
+      </div>
+      <div class="box teal" style="margin-top:6px">
+        <strong>Relevante dbutils in dispDB:</strong>
+        <ul style="margin-top:4px">
+          <li><span class="ic">secrets</span>: Oracle-PW, AS/400-Creds aus Key Vault</li>
+          <li><span class="ic">widgets</span>: Stichtags-Parameter für ETL-Runs</li>
+          <li><span class="ic">notebook.run</span>: Orchestrierung Bronze→Silver→Gold</li>
+          <li><span class="ic">fs</span>: ADLS Gen2 via <span class="ic">/mnt/</span> navigieren</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 9. PITFALLS ── -->
+  <div class="card">
+    <div class="card-header coral">9 · Typische Pitfalls</div>
+    <div class="card-body">
+      <div class="box coral">
+        <ul>
+          <li><strong>Cluster nicht gestoppt</strong> — immer Auto-Termination setzen!</li>
+          <li><strong>%sh</strong> läuft nur auf Driver-Node, kein Ersatz für Spark</li>
+          <li><strong>No Isolation Shared</strong> + Unity Catalog = Fehler</li>
+          <li><strong>DBR-Versionen</strong> Prod und Dev identisch halten</li>
+          <li><strong>%pip</strong> nur aktive Session — bei Cluster-Neustart weg; besser: Cluster-Library oder Init Script</li>
+          <li><strong>Passwörter</strong> nie direkt im Notebook — <span class="ic">dbutils.secrets</span> nutzen!</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<!-- ══════════════════════════════════════════════════════
+     SEITE 2: dbutils Vertiefung & Workspace-/Stage-Topologie
+     ══════════════════════════════════════════════════════ -->
+
+<div class="page-header" style="margin-top:32px; border-top: 3px solid var(--purple); padding-top:16px;">
+  <h1>Databricks Kurs — Kapitel 1 · Seite 2</h1>
+  <h2>dbutils Vertiefung &amp; Workspace-/Stage-Topologie</h2>
+  <p>dispDB · Azure Databricks · Stand: Juni 2025</p>
+</div>
+
+<div class="grid">
+
+  <!-- 10. WAS IST DBUTILS? -->
+  <div class="card">
+    <div class="card-header purple">10 · Was ist dbutils — und woher kommt es?</div>
+    <div class="card-body">
+      <div class="box purple">
+        <strong>dbutils ist kein PyPI-Paket.</strong> Es ist ein Databricks-eigenes Utility-Objekt, das beim Cluster-Start automatisch in jeden Python-, Scala- und R-Kernel <strong>injiziert</strong> wird — zusammen mit <span class="ic">spark</span> (SparkSession) und <span class="ic">sc</span> (SparkContext). Kein <span class="ic">import</span>, kein <span class="ic">pip install</span> nötig oder möglich.
+      </div>
+      <table style="margin-top:8px">
+        <tr><th>Objekt</th><th>Herkunft / Verfügbarkeit</th></tr>
+        <tr><td><span class="ic">dbutils</span></td><td>Databricks REPL-Injektion, immer verfügbar</td></tr>
+        <tr><td><span class="ic">spark</span></td><td>SparkSession, automatisch gestartet</td></tr>
+        <tr><td><span class="ic">sc</span></td><td>SparkContext (via <span class="ic">spark.sparkContext</span>)</td></tr>
+        <tr><td><span class="ic">display()</span></td><td>Databricks-Renderfunktion für DataFrames</td></tr>
+      </table>
+      <pre style="margin-top:8px"><span class="cmt"># Hilfe direkt im Notebook:</span>
+<span class="fn">dbutils</span>.help()          <span class="cmt"># Alle Module</span>
+<span class="fn">dbutils</span>.fs.help()       <span class="cmt"># Alle fs-Methoden</span>
+<span class="fn">dbutils</span>.fs.help(<span class="str">"ls"</span>)   <span class="cmt"># Doku einer Methode</span></pre>
+    </div>
+  </div>
+
+  <!-- 11. DBUTILS.FS VERTIEFT -->
+  <div class="card">
+    <div class="card-header purple">11 · dbutils.fs — vollständig</div>
+    <div class="card-body">
+      <pre><span class="cmt"># Navigation</span>
+<span class="fn">dbutils</span>.fs.ls(<span class="str">"/mnt/bronze/"</span>)
+<span class="fn">dbutils</span>.fs.ls(<span class="str">"abfss://bronze@"</span>
+  + <span class="str">"dispdbstorage.dfs.core.windows.net/"</span>)
+
+<span class="cmt"># Dateioperationen</span>
+<span class="fn">dbutils</span>.fs.mkdirs(<span class="str">"/mnt/silver/as400/"</span>)
+<span class="fn">dbutils</span>.fs.cp(<span class="str">"/mnt/bronze/f.csv"</span>,
+              <span class="str">"/mnt/silver/f.csv"</span>)
+<span class="fn">dbutils</span>.fs.mv(<span class="str">"/mnt/tmp/x.parq"</span>,
+              <span class="str">"/mnt/silver/x.parq"</span>)
+<span class="fn">dbutils</span>.fs.rm(<span class="str">"/mnt/tmp/"</span>, recurse=<span class="kw">True</span>)
+
+<span class="cmt"># Kleinen Dateiinhalt lesen</span>
+txt = <span class="fn">dbutils</span>.fs.head(
+    <span class="str">"/mnt/bronze/config.json"</span>, maxBytes=<span class="str">10000</span>)
+
+<span class="cmt"># Mounts</span>
+<span class="fn">dbutils</span>.fs.mounts()
+<span class="fn">dbutils</span>.fs.unmount(<span class="str">"/mnt/bronze"</span>)</pre>
+      <div class="box amber" style="margin-top:6px">
+        <strong>Mount vs. Direct Access:</strong> Mounts (<span class="ic">/mnt/…</span>) sind klassisch. Mit Unity Catalog wird Direct Access (<span class="ic">abfss://…</span>) bevorzugt — keine Konfiguration nötig, bessere Governance. Details in Kapitel 2.
+      </div>
+    </div>
+  </div>
+
+  <!-- 12. DBUTILS.SECRETS VERTIEFT -->
+  <div class="card">
+    <div class="card-header purple">12 · dbutils.secrets — vollständig</div>
+    <div class="card-body">
+      <pre><span class="cmt"># Secret lesen — in Logs: [REDACTED]</span>
+pw = <span class="fn">dbutils</span>.secrets.get(
+    scope=<span class="str">"dispdb-kv"</span>,
+    key=<span class="str">"oracle-password"</span>)
+
+<span class="cmt"># Verfügbare Scopes und Keys</span>
+<span class="fn">dbutils</span>.secrets.listScopes()
+<span class="fn">dbutils</span>.secrets.list(<span class="str">"dispdb-kv"</span>)
+<span class="cmt"># Gibt nur Key-Namen, nie Werte!</span>
+
+<span class="cmt"># Typisch: Oracle via JDBC</span>
+df = spark.read.format(<span class="str">"jdbc"</span>)   .option(<span class="str">"url"</span>,
+    <span class="fn">dbutils</span>.secrets.get(
+      <span class="str">"dispdb-kv"</span>, <span class="str">"oracle-jdbc-url"</span>))   .option(<span class="str">"dbtable"</span>, <span class="str">"IRCORSU.V_BESTAND"</span>)   .option(<span class="str">"user"</span>,
+    <span class="fn">dbutils</span>.secrets.get(
+      <span class="str">"dispdb-kv"</span>, <span class="str">"oracle-user"</span>))   .option(<span class="str">"password"</span>,
+    <span class="fn">dbutils</span>.secrets.get(
+      <span class="str">"dispdb-kv"</span>, <span class="str">"oracle-password"</span>))   .load()</pre>
+      <div class="box teal" style="margin-top:6px">
+        <strong>Secret Scope-Typen:</strong>
+        <ul style="margin-top:3px">
+          <li><strong>Key Vault-backed:</strong> Secrets in Azure Key Vault, Konzern verwaltet zentral — <strong>Empfehlung dispDB</strong></li>
+          <li><strong>Databricks-intern:</strong> Einfacher, weniger Governance</li>
+        </ul>
+        Werte sind <strong>niemals</strong> im Klartext lesbar — auch nicht für Admins.
+      </div>
+    </div>
+  </div>
+
+  <!-- 13. DBUTILS.WIDGETS & NOTEBOOK -->
+  <div class="card">
+    <div class="card-header purple">13 · dbutils.widgets &amp; .notebook — vollständig</div>
+    <div class="card-body">
+      <h3><span class="label teal">Widget-Typen</span></h3>
+      <pre><span class="fn">dbutils</span>.widgets.text(
+    <span class="str">"run_date"</span>, <span class="str">"2025-01-01"</span>, <span class="str">"Stichtag"</span>)
+<span class="fn">dbutils</span>.widgets.dropdown(
+    <span class="str">"sparte"</span>, <span class="str">"NL"</span>,
+    [<span class="str">"NL"</span>, <span class="str">"L"</span>, <span class="str">"ALL"</span>], <span class="str">"Sparte"</span>)
+<span class="fn">dbutils</span>.widgets.combobox(
+    <span class="str">"schema"</span>, <span class="str">"silver"</span>,
+    [<span class="str">"bronze"</span>,<span class="str">"silver"</span>,<span class="str">"gold"</span>])
+<span class="fn">dbutils</span>.widgets.multiselect(
+    <span class="str">"kpis"</span>, <span class="str">"Bestand"</span>,
+    [<span class="str">"Bestand"</span>,<span class="str">"Neuzugang"</span>,<span class="str">"Beitrag"</span>])
+stichtag = <span class="fn">dbutils</span>.widgets.get(<span class="str">"run_date"</span>)
+<span class="fn">dbutils</span>.widgets.removeAll()</pre>
+      <h3 style="margin-top:8px"><span class="label teal">Notebook-Orchestrierung</span></h3>
+      <pre>result = <span class="fn">dbutils</span>.notebook.run(
+    path=<span class="str">"./silver/as400_bestand"</span>,
+    timeout_seconds=<span class="str">3600</span>,
+    arguments={
+        <span class="str">"run_date"</span>: <span class="str">"2025-06-01"</span>,
+        <span class="str">"sparte"</span>:   <span class="str">"NL"</span>})
+<span class="cmt"># result = String aus notebook.exit()</span>
+
+<span class="fn">dbutils</span>.notebook.exit(
+    <span class="str">'{"rows": 12345, "status": "ok"}'</span>)
+
+ctx    = <span class="fn">dbutils</span>.notebook.getContext()
+job_id = ctx.jobId().get()
+run_id = ctx.jobRunId().get()
+nb_path= ctx.notebookPath().get()</pre>
+      <div class="box purple" style="margin-top:6px">
+        <strong>Widgets + Jobs:</strong> Workflow-Jobs übergeben Widget-Werte als <span class="ic">arguments</span>-Dictionary — das Notebook merkt keinen Unterschied zur interaktiven Nutzung.
+      </div>
+    </div>
+  </div>
+
+  <!-- 14. WORKSPACE- UND STAGE-TOPOLOGIE -->
+  <div class="card">
+    <div class="card-header teal">14 · Workspace- &amp; Stage-Topologie (Konzern)</div>
+    <div class="card-body">
+      <div class="box teal">
+        <strong>Konzern-Bereitstellung:</strong> Ein Azure Databricks Workspace je Stage — Dev, Test, Prod. Jeder Workspace ist vollständig isoliert: eigene Cluster, eigene Zugriffsrechte, eigener Catalog.
+      </div>
+      <div class="box teal" style="margin-top:6px">
+        <strong>Medallion in jedem Workspace vollständig:</strong> Ja — Bronze→Silver→Gold läuft in Dev, Test und Prod identisch. Code wird einmal entwickelt und via Git in alle drei Workspaces deployed.
+      </div>
+      <table style="margin-top:8px">
+        <tr><th></th><th>DEV</th><th>TEST</th><th>PROD</th></tr>
+        <tr><td>Cluster</td><td>All-Purpose</td><td>Job</td><td>Job</td></tr>
+        <tr><td>Datenquelle</td><td>Testkopie</td><td>Vollständig</td><td>Live</td></tr>
+        <tr><td>Scheduling</td><td>Manuell</td><td>Integrationstest</td><td>Daily</td></tr>
+        <tr><td>Power BI</td><td>Dev-Report</td><td>QS-Report</td><td>Produktion</td></tr>
+        <tr><td>Catalog</td><td>dispdb-dev</td><td>dispdb-test</td><td>dispdb-prod</td></tr>
+      </table>
+      <div class="box gray" style="margin-top:8px">
+        <strong>Workspace ≠ Unity Catalog Metastore:</strong> Der Metastore kann über mehrere Workspaces geteilt werden. Typisch: ein Konzern-Metastore, drei Catalogs (dev/test/prod), je einem Workspace zugeordnet.
+      </div>
+    </div>
+  </div>
+
+  <!-- 15. GOLD-LAYER-DESIGN -->
+  <div class="card">
+    <div class="card-header teal">15 · Gold-Layer-Design: Catalog vs. Schema</div>
+    <div class="card-body">
+      <h3><span class="label teal">Option A — Ein Catalog, Schemas je Domäne</span></h3>
+      <pre><span class="cmt"># Empfehlung dispDB Phase I</span>
+dispdb.bronze.*          <span class="cmt"># Rohdaten alle Quellen</span>
+dispdb.silver.*          <span class="cmt"># Bereinigt</span>
+dispdb.gold_vertrieb.*   <span class="cmt"># KPIs Vertrieb</span>
+dispdb.gold_schaden.*    <span class="cmt"># KPIs Schaden</span>
+dispdb.gold_finanzen.*   <span class="cmt"># KPIs Finanzen</span></pre>
+      <div class="box teal" style="margin-top:6px">
+        <strong>Warum Option A für dispDB:</strong>
+        <ul style="margin-top:3px">
+          <li>Einfacher Start — ein Catalog-Admin reicht</li>
+          <li>Gemeinsame Dimensions-Tabellen möglich</li>
+          <li>Später zu Option B migrierbar</li>
+          <li>Zugriffsrechte über Schema-Grants steuerbar</li>
+        </ul>
+      </div>
+      <h3 style="margin-top:8px"><span class="label" style="background:var(--gray-light);color:var(--gray-dark)">Option B — Catalog je Domäne (Phase II)</span></h3>
+      <pre><span class="cmt"># Stärkere Isolation, mehr Verwaltung</span>
+vertrieb.gold.*   <span class="cmt"># Eigener Catalog Vertrieb</span>
+schaden.gold.*    <span class="cmt"># Eigener Catalog Schaden</span>
+finanzen.gold.*   <span class="cmt"># Eigener Catalog Finanzen</span></pre>
+    </div>
+  </div>
+
+  <!-- 16. OFFENE FRAGEN AN KONZERN -->
+  <div class="card">
+    <div class="card-header coral">16 · Offene Fragen — Klärung mit Konzern</div>
+    <div class="card-body">
+      <div class="box coral">
+        <strong>Vor Kapitel 2 (Unity Catalog) klären:</strong>
+        <ul style="margin-top:4px">
+          <li><strong>Metastore:</strong> Einer für alle Workspaces oder je einer?</li>
+          <li><strong>Catalog-Erstellung:</strong> Konzern-Admin oder eigene Admin-Rechte?</li>
+          <li><strong>ADLS:</strong> Getrennte Storage Accounts je Stage oder ein Account mit drei Containern?</li>
+          <li><strong>Cluster Policies:</strong> Bereits vorgegeben oder frei konfigurierbar?</li>
+          <li><strong>Secret Scopes:</strong> Key Vault-backed (bevorzugt) oder Databricks-intern?</li>
+          <li><strong>UC Access Mode:</strong> Shared Mode erlaubt, oder nur Single User?</li>
+        </ul>
+        <div style="margin-top:6px;font-size:11px">
+          Diese Antworten bestimmen direkt das Unity-Catalog-Design in Kapitel 2.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /grid seite 2 -->
+
+<div class="page-footer" style="margin-top:16px">
+  <span>dispDB Databricks Kurs · Kapitel 1: Workspace, Cluster &amp; Notebooks</span>
+  <span>Azure Databricks · Stand: Juni 2025</span>
+</div>
+
+</body>
+</html>
